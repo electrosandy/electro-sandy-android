@@ -1,13 +1,73 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // A signed-in account can access only its own shop namespace.
-    match /shops/{userId}/{document=**} {
-      allow read, write: if request.auth != null
-        && request.auth.uid == userId;
+    function isShopOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
     }
 
-    // Deny access to every document outside the shop namespace.
+    function validCategory(category) {
+      return category in [
+        'products', 'orders', 'customers', 'purchases',
+        'cashEntries', 'cashClosings', 'stockAudits',
+        'sellerProfile', 'activityLog', 'warranties',
+        'suppliers', 'returns'
+      ];
+    }
+
+    match /shops/{userId}/snapshotMeta/current {
+      allow read: if isShopOwner(userId);
+      allow create, update: if isShopOwner(userId)
+        && request.resource.data.keys().hasOnly(['snapshotId', 'categories', 'updatedAt'])
+        && request.resource.data.snapshotId is string
+        && request.resource.data.snapshotId.matches('^[a-z0-9-]{1,64}$')
+        && request.resource.data.categories is list
+        && request.resource.data.categories.size() == 12
+        && request.resource.data.updatedAt is int;
+      allow delete: if false;
+    }
+
+    match /shops/{userId}/snapshots/{snapshotId} {
+      allow read: if isShopOwner(userId);
+      allow create, update: if isShopOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'snapshotId', 'categories', 'categoryCount',
+          'createdAt', 'schemaVersion', 'status'
+        ])
+        && request.resource.data.snapshotId == snapshotId
+        && request.resource.data.categoryCount == 12
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.status == 'READY';
+      allow delete: if false;
+
+      match /meta/{category} {
+        allow read: if isShopOwner(userId) && validCategory(category);
+        allow create, update: if isShopOwner(userId)
+          && validCategory(category)
+          && request.resource.data.keys().hasOnly(['chunkCount', 'updatedAt'])
+          && request.resource.data.chunkCount is int
+          && request.resource.data.chunkCount >= 1
+          && request.resource.data.chunkCount <= 10000
+          && request.resource.data.updatedAt is int;
+        allow delete: if false;
+      }
+
+      match /data/{category}/chunks/{chunkId} {
+        allow read: if isShopOwner(userId) && validCategory(category);
+        allow create, update: if isShopOwner(userId)
+          && validCategory(category)
+          && chunkId.matches('^[0-9]{6}$')
+          && request.resource.data.keys().hasOnly(['index', 'data', 'updatedAt'])
+          && request.resource.data.index is int
+          && request.resource.data.index >= 0
+          && request.resource.data.index < 10000
+          && request.resource.data.index == int(chunkId)
+          && request.resource.data.data is string
+          && request.resource.data.data.size() <= 100000
+          && request.resource.data.updatedAt is int;
+        allow delete: if false;
+      }
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
