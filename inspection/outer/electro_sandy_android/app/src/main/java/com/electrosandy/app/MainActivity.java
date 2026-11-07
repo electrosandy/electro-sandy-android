@@ -23,6 +23,7 @@ import org.json.JSONObject;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.ListenerRegistration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Locale;
@@ -34,7 +35,18 @@ public class MainActivity extends FragmentActivity {
 
     private static class WebAppInterface {
         private final Activity activity;
+        private ListenerRegistration cloudSnapshotListener;
         WebAppInterface(Activity activity) { this.activity = activity; }
+        private void watchCloudSnapshot(String uid) {
+            if (cloudSnapshotListener != null) cloudSnapshotListener.remove();
+            cloudSnapshotListener = FirebaseFirestore.getInstance().collection("shops").document(uid)
+                .collection("snapshotMeta").document("current")
+                .addSnapshotListener((snapshot, error) -> {
+                    if (error != null) return;
+                    String snapshotId = snapshot != null && snapshot.exists() ? snapshot.getString("snapshotId") : "";
+                    sendCloudJs("window.onCloudRemoteSnapshotChanged("+JSONObject.quote(snapshotId == null ? "" : snapshotId)+")");
+                });
+        }
         @JavascriptInterface public void authenticateBiometric() {
             activity.runOnUiThread(() -> {
                 if (!(activity instanceof MainActivity)) return;
@@ -125,6 +137,7 @@ public class MainActivity extends FragmentActivity {
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful() && task.getResult() != null && task.getResult().getUser() != null) {
                         String uid = task.getResult().getUser().getUid();
+                        watchCloudSnapshot(uid);
                         sendCloudJs("window.onCloudAuthResult(true,'تم تسجيل الدخول إلى حساب المزامنة',"+JSONObject.quote(uid)+")");
                     } else {
                         String message = task.getException() == null ? "تعذر تسجيل الدخول" : task.getException().getMessage();
@@ -135,10 +148,12 @@ public class MainActivity extends FragmentActivity {
         @JavascriptInterface public void cloudCheckAuth() {
             if (FirebaseAuth.getInstance().getCurrentUser() != null) {
                 String uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
+                watchCloudSnapshot(uid);
                 sendCloudJs("window.onCloudAuthResult(true,'جلسة المزامنة محفوظة',"+JSONObject.quote(uid)+")");
             }
         }
         @JavascriptInterface public void cloudSignOut() {
+            if (cloudSnapshotListener != null) { cloudSnapshotListener.remove(); cloudSnapshotListener = null; }
             FirebaseAuth.getInstance().signOut();
             sendCloudJs("window.onCloudSignedOut && window.onCloudSignedOut()");
         }
