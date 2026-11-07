@@ -134,7 +134,7 @@ public class MainActivity extends FragmentActivity {
             sendCloudJs("window.onCloudSignedOut && window.onCloudSignedOut()");
         }
         @JavascriptInterface public void cloudWriteChunk(String category, int index, String data) {
-            String uid = FirebaseAuth.getInstance().getUid();
+            String uid = (FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid());
             if (uid == null) {
                 sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",false,'سجل الدخول أولاً')");
                 return;
@@ -150,7 +150,7 @@ public class MainActivity extends FragmentActivity {
                 .addOnFailureListener(e -> sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",false,"+JSONObject.quote(e.getMessage())+")"));
         }
         @JavascriptInterface public void cloudFinishCategory(String category, int count) {
-            String uid = FirebaseAuth.getInstance().getUid();
+            String uid = (FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid());
             if (uid == null) {
                 sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",false,'سجل الدخول أولاً')");
                 return;
@@ -164,7 +164,7 @@ public class MainActivity extends FragmentActivity {
                 .addOnFailureListener(e -> sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",false,"+JSONObject.quote(e.getMessage())+")"));
         }
         @JavascriptInterface public void cloudDownloadSnapshot() {
-            String uid = FirebaseAuth.getInstance().getUid();
+            String uid = (FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid());
             if (uid == null) {
                 sendCloudJs("window.onCloudDownloadError('سجل الدخول أولاً')");
                 return;
