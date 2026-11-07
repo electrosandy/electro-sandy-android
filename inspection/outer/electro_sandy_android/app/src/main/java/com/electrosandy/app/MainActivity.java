@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebViewClient;
 import android.webkit.ValueCallback;
 import android.content.Intent;
@@ -13,6 +14,19 @@ import android.content.Context;
 
 public class MainActivity extends Activity {
     private WebView webView;
+
+    private static class WebAppInterface {
+        private final Activity activity;
+        WebAppInterface(Activity activity) { this.activity = activity; }
+        @JavascriptInterface public void shareText(String text) {
+            activity.runOnUiThread(() -> {
+                Intent send = new Intent(Intent.ACTION_SEND);
+                send.setType("text/plain");
+                send.putExtra(Intent.EXTRA_TEXT, text == null ? "" : text);
+                activity.startActivity(Intent.createChooser(send, "مشاركة الفاتورة"));
+            });
+        }
+    }
     private ValueCallback<Uri[]> fileCallback;
     private static final int FILE_CHOOSER = 1001;
 
@@ -25,6 +39,7 @@ public class MainActivity extends Activity {
         webView.getSettings().setDomStorageEnabled(true);
         webView.getSettings().setAllowFileAccess(true);
         webView.getSettings().setAllowContentAccess(true);
+        webView.addJavascriptInterface(new WebAppInterface(this), "AndroidShare");
         webView.setWebViewClient(new WebViewClient());
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
