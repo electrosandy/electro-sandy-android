@@ -12,18 +12,45 @@ import android.net.Uri;
 import android.print.PrintManager;
 import android.print.PrintAttributes;
 import android.content.Context;
+import androidx.fragment.app.FragmentActivity;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
 import android.speech.RecognizerIntent;
 import java.util.ArrayList;
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 import org.json.JSONObject;
 
-public class MainActivity extends Activity {
+public class MainActivity extends FragmentActivity {
     private WebView webView;
 
     private static class WebAppInterface {
         private final Activity activity;
         WebAppInterface(Activity activity) { this.activity = activity; }
+        @JavascriptInterface public void authenticateBiometric() {
+            activity.runOnUiThread(() -> {
+                if (!(activity instanceof MainActivity)) return;
+                MainActivity main = (MainActivity) activity;
+                try {
+                    BiometricPrompt prompt = new BiometricPrompt(main, ContextCompat.getMainExecutor(main), new BiometricPrompt.AuthenticationCallback() {
+                        @Override public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+                            if (main.webView != null) main.webView.evaluateJavascript("window.onBiometricAuthenticated()", null);
+                        }
+                        @Override public void onAuthenticationError(int code, CharSequence message) {
+                            if (main.webView != null) main.webView.evaluateJavascript("window.onBiometricError(" + JSONObject.quote(String.valueOf(message)) + ")", null);
+                        }
+                    });
+                    BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
+                        .setTitle("ELECTRO Sandy")
+                        .setSubtitle("تأكيد الهوية بالبصمة")
+                        .setNegativeButtonText("إلغاء")
+                        .build();
+                    prompt.authenticate(info);
+                } catch (Exception error) {
+                    if (main.webView != null) main.webView.evaluateJavascript("window.onBiometricError('تعذر تشغيل البصمة على هذا الجهاز')", null);
+                }
+            });
+        }
         @JavascriptInterface public void startVoiceSearch() {
             activity.runOnUiThread(() -> {
                 Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
@@ -86,6 +113,7 @@ public class MainActivity extends Activity {
         webView.addJavascriptInterface(bridge, "AndroidShare");
         webView.addJavascriptInterface(bridge, "AndroidScanner");
         webView.addJavascriptInterface(bridge, "AndroidVoice");
+        webView.addJavascriptInterface(bridge, "AndroidBiometric");
         webView.setWebViewClient(new WebViewClient());
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
