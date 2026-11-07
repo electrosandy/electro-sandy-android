@@ -382,13 +382,22 @@ function recordReturn(){
  let pointsShare=baseSubtotal>0?loyaltyDiscount*(baseReturned/baseSubtotal):0,
  refund=Math.max(0,baseReturned-pointsShare),
  unitCost=item.unitCost,
- cost=unitCost!==null&&unitCost!==undefined&&unitCost!==''&&Number.isFinite(Number(unitCost))?Number(unitCost)*qty:null;
+ cost=unitCost!==null&&unitCost!==undefined&&unitCost!==''&&Number.isFinite(Number(unitCost))&&Number(unitCost)>=0?Number(unitCost)*qty:null;
  if(!Number.isFinite(refund)||!Number.isFinite(cost??0))return toast('تعذر حساب قيمة الإرجاع');
  let balance=Number(order.balance??(String(order.payment||'').includes('دين')?order.total:0));
  if(!Number.isFinite(balance)||balance<0)return toast('رصيد الدين في الفاتورة غير سليم');
  let debtOffset=Math.min(balance,refund),cashRefund=Math.max(0,refund-debtOffset),
  paidBefore=Number(order.paidAmount??(String(order.payment||'').includes('دين')?0:order.total||0));
  if(!Number.isFinite(paidBefore)||paidBefore<0)return toast('مبلغ الأداء المسجل في الفاتورة غير سليم');
+ let totalValue=Number(order.total??(baseSubtotal-loyaltyDiscount)),
+ priorReturned=Number(order.returnedAmount||0),priorReturnedBase=Number(order.returnedBaseAmount||0),priorCashRefund=Number(order.cashRefundTotal||0),priorReturnCost=Number(order.returnCostTotal||0);
+ if(!Number.isFinite(totalValue)||totalValue<0||![priorReturned,priorReturnedBase,priorCashRefund,priorReturnCost].every(x=>Number.isFinite(x)&&x>=0)||Math.abs((paidBefore+balance)-(totalValue-priorReturned))>0.01||priorReturned+refund>totalValue+0.01||priorReturnedBase+baseReturned>baseSubtotal+0.01)return toast('إجمالي الفاتورة أو سجل المرتجعات غير متطابق؛ لم يتم تسجيل الإرجاع');
+ let redeemedPoints=Number(order.loyaltyPointsRedeemed||0),restoredPoints=Number(order.loyaltyPointsRestored||0),earnedPoints=Number(order.loyaltyPointsEarned||0),reversedPoints=Number(order.loyaltyPointsReversed||0);
+ if(![redeemedPoints,restoredPoints,earnedPoints,reversedPoints].every(x=>Number.isInteger(x)&&x>=0)||restoredPoints>redeemedPoints||reversedPoints>earnedPoints)return toast('سجل نقاط الوفاء في الفاتورة غير سليم');
+ let orderCustomerId=order.customerId||order.customerInfo?.id,customerRecord=orderCustomerId?customers.find(x=>x.id===orderCustomerId):null,customerPoints=customerRecord?Number(customerRecord.loyaltyPoints||0):0;
+ if(customerRecord&&(!Number.isFinite(customerPoints)||customerPoints<0))return toast('رصيد نقاط الزبون غير صالح؛ لم يتم تسجيل الإرجاع');
+ let targetRestore=Math.min(redeemedPoints,Math.floor(redeemedPoints*Math.min(1,baseSubtotal>0?(priorReturnedBase+baseReturned)/baseSubtotal:0))),restorePoints=Math.max(0,targetRestore-restoredPoints),
+ targetReverse=Math.min(earnedPoints,Math.floor((priorReturned+refund)/10)),reversePoints=Math.max(0,targetReverse-reversedPoints);
  let stockBeforeReturn=Number(p.central||0)+Number(p.van1||0)+Number(p.van2||0);
  if(!Number.isFinite(stockBeforeReturn)||stockBeforeReturn<0)return toast('إجمالي المخزون غير صالح');
  let now=new Date(),stamp=now.toISOString(),date=now.toLocaleString();
@@ -406,25 +415,12 @@ function recordReturn(){
  if(!(item.serials||[]).length)warranties.filter(w=>w.invoiceId===order.id&&w.productId===item.productId&&!w.serial&&w.status!=='returned').slice(0,qty).forEach(w=>w.status='returned');
  order.balance=Math.max(0,balance-debtOffset);
  order.paidAmount=Math.max(0,paidBefore-cashRefund);
- order.cashRefundTotal=Number(order.cashRefundTotal||0)+cashRefund;
+ order.cashRefundTotal=priorCashRefund+cashRefund;
  if(cashRefund>0)cashEntries.unshift({id:Date.now()+1,amount:cashRefund,note:'استرجاع فاتورة '+(order.invoiceNo||order.id),type:'out',method:String(order.payment||'').includes('تحويل')?'bank':'cash',entryKind:'sale_refund',relatedOrderId:order.id,createdAt:stamp,date});
- order.returnedAmount=Number(order.returnedAmount||0)+refund;
- order.returnedBaseAmount=Number(order.returnedBaseAmount||0)+baseReturned;
- if(cost!==null)order.returnCostTotal=Number(order.returnCostTotal||0)+cost;
- let orderCustomerId=order.customerId||order.customerInfo?.id;
- if(orderCustomerId){
-  let customerRecord=customers.find(x=>x.id===orderCustomerId);
-  if(customerRecord){
-   let targetRestore=Math.min(Number(order.loyaltyPointsRedeemed||0),Math.floor(Number(order.loyaltyPointsRedeemed||0)*Math.min(1,baseSubtotal>0?Number(order.returnedBaseAmount||0)/baseSubtotal:0))),
-   restorePoints=Math.max(0,targetRestore-Number(order.loyaltyPointsRestored||0));
-   customerRecord.loyaltyPoints=Number(customerRecord.loyaltyPoints||0)+restorePoints;
-   order.loyaltyPointsRestored=Number(order.loyaltyPointsRestored||0)+restorePoints;
-   let targetReverse=Math.min(Number(order.loyaltyPointsEarned||0),Math.floor(Number(order.returnedAmount||0)/10)),
-   reversePoints=Math.max(0,targetReverse-Number(order.loyaltyPointsReversed||0));
-   customerRecord.loyaltyPoints=Math.max(0,Number(customerRecord.loyaltyPoints||0)-reversePoints);
-   order.loyaltyPointsReversed=Number(order.loyaltyPointsReversed||0)+reversePoints;
-  }
- }
+ order.returnedAmount=priorReturned+refund;
+ order.returnedBaseAmount=priorReturnedBase+baseReturned;
+ if(cost!==null)order.returnCostTotal=priorReturnCost+cost;
+ if(customerRecord){customerRecord.loyaltyPoints=Math.max(0,customerPoints+restorePoints-reversePoints);order.loyaltyPointsRestored=restoredPoints+restorePoints;order.loyaltyPointsReversed=reversedPoints+reversePoints}
  let record={id:Date.now(),orderId:order.id,invoiceNo:order.invoiceNo||String(order.id),productId:item.productId,productName:item.name,qty,serials,refund,costReturned:cost,reason,date,createdAt:stamp};
  returns.unshift(record);
  localStorage.setItem('es13_returns',JSON.stringify(returns));
