@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainActivity extends FragmentActivity {
     private WebView webView;
@@ -122,6 +123,12 @@ public class MainActivity extends FragmentActivity {
                     }
                 });
         }
+        @JavascriptInterface public void cloudCheckAuth() {
+            if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+                String uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
+                sendCloudJs("window.onCloudAuthResult(true,'جلسة المزامنة محفوظة',"+JSONObject.quote(uid)+")");
+            }
+        }
         @JavascriptInterface public void cloudSignOut() {
             FirebaseAuth.getInstance().signOut();
             sendCloudJs("window.onCloudSignedOut && window.onCloudSignedOut()");
@@ -171,6 +178,7 @@ public class MainActivity extends FragmentActivity {
                         return;
                     }
                     AtomicInteger completed = new AtomicInteger(0);
+                    AtomicBoolean failed = new AtomicBoolean(false);
                     for (QueryDocumentSnapshot metaDoc : metaSnapshot) {
                         String category = metaDoc.getId();
                         Long countValue = metaDoc.getLong("chunkCount");
@@ -184,9 +192,13 @@ public class MainActivity extends FragmentActivity {
                                         sendCloudJs("window.onCloudChunkReceived("+JSONObject.quote(category)+","+index+","+count+","+JSONObject.quote(data)+")");
                                     }
                                 }
-                                if (completed.incrementAndGet() == total) sendCloudJs("window.onCloudDownloadComplete(true)");
+                                if (completed.incrementAndGet() == total && !failed.get()) sendCloudJs("window.onCloudDownloadComplete(true)");
                             })
-                            .addOnFailureListener(e -> sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+")"));
+                            .addOnFailureListener(e -> {
+                                failed.set(true);
+                                sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+")");
+                                completed.incrementAndGet();
+                            });
                     }
                 })
                 .addOnFailureListener(e -> sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+")"));
