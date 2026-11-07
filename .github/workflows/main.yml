@@ -60,6 +60,22 @@ jobs:
           fi
           test -s "$HOME/.android/debug.keystore"
 
+      - name: Validate embedded JavaScript syntax
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const htmlPath = path.join(process.env.PROJECT_DIR, 'app/src/main/assets/www/index.html');
+          const html = fs.readFileSync(htmlPath, 'utf8');
+          const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)];
+          if (!scripts.length) throw new Error('No embedded JavaScript found');
+          scripts.forEach((match, index) => {
+            new Function(match[1]);
+            console.log(`JavaScript block ${index + 1}: syntax OK`);
+          });
+          NODE
+
       - name: Build Android APK
         run: |
           cd "$PROJECT_DIR"
