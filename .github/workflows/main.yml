@@ -1,4 +1,4 @@
-name: Build Android APK # Product creation access fix
+name: Build Android APK # Keep product modal save action visible
 
 on:
   workflow_dispatch:
