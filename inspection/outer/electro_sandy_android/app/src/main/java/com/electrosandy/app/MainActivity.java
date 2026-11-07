@@ -69,7 +69,9 @@ public class MainActivity extends Activity {
         webView.getSettings().setDomStorageEnabled(true);
         webView.getSettings().setAllowFileAccess(true);
         webView.getSettings().setAllowContentAccess(true);
-        webView.addJavascriptInterface(new WebAppInterface(this), "AndroidShare");
+        WebAppInterface bridge = new WebAppInterface(this);
+        webView.addJavascriptInterface(bridge, "AndroidShare");
+        webView.addJavascriptInterface(bridge, "AndroidScanner");
         webView.setWebViewClient(new WebViewClient());
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
