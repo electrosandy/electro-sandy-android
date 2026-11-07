@@ -14,14 +14,24 @@ service cloud.firestore {
       ];
     }
 
+    function validCategoryList(categories) {
+      return categories is list
+        && categories.size() == 12
+        && categories.hasAll([
+          'products', 'orders', 'customers', 'purchases',
+          'cashEntries', 'cashClosings', 'stockAudits',
+          'sellerProfile', 'activityLog', 'warranties',
+          'suppliers', 'returns'
+        ]);
+    }
+
     match /shops/{userId}/snapshotMeta/current {
       allow read: if isShopOwner(userId);
       allow create, update: if isShopOwner(userId)
         && request.resource.data.keys().hasOnly(['snapshotId', 'categories', 'updatedAt'])
         && request.resource.data.snapshotId is string
         && request.resource.data.snapshotId.matches('^[a-z0-9-]{1,64}$')
-        && request.resource.data.categories is list
-        && request.resource.data.categories.size() == 12
+        && validCategoryList(request.resource.data.categories)
         && request.resource.data.updatedAt is int;
       allow delete: if false;
     }
@@ -38,8 +48,7 @@ service cloud.firestore {
         && request.resource.data.schemaVersion == 1
         && request.resource.data.status == 'READY'
         && request.resource.data.createdAt is int
-        && request.resource.data.categories is list
-        && request.resource.data.categories.size() == 12;
+        && validCategoryList(request.resource.data.categories);
       allow delete: if false;
 
       match /meta/{category} {
