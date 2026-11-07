@@ -7,7 +7,7 @@
 - Database: Cloud Firestore (Standard)
 
 ## Security rules
-The `firestore.rules` file limits each signed-in account to its own `shops/{uid}` data and validates snapshot categories, metadata, and chunk sizes. The repository rules file is **not automatically published** to Firebase when this repository changes.
+The `firestore.rules` file limits each signed-in account to its own `shops/{uid}` data. It accepts only the exact 12 synchronization categories (without omissions), validates snapshot metadata and chunk sizes, and denies access outside the shop snapshot paths. The Java layer additionally verifies chunk indexes, IDs, uniqueness, and completeness before publishing or restoring a snapshot. The repository rules file is **not automatically published** to Firebase when this repository changes.
 
 To publish it with the Firebase CLI, run from this Android project directory:
 
