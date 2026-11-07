@@ -12,6 +12,9 @@ import android.net.Uri;
 import android.print.PrintManager;
 import android.print.PrintAttributes;
 import android.content.Context;
+import com.google.zxing.integration.android.IntentIntegrator;
+import com.google.zxing.integration.android.IntentResult;
+import org.json.JSONObject;
 
 public class MainActivity extends Activity {
     private WebView webView;
@@ -19,6 +22,16 @@ public class MainActivity extends Activity {
     private static class WebAppInterface {
         private final Activity activity;
         WebAppInterface(Activity activity) { this.activity = activity; }
+        @JavascriptInterface public void scanBarcode() {
+            activity.runOnUiThread(() -> {
+                IntentIntegrator scanner = new IntentIntegrator(activity);
+                scanner.setDesiredBarcodeFormats(IntentIntegrator.ALL_CODE_TYPES);
+                scanner.setPrompt("وجّه الكاميرا نحو الباركود أو QR");
+                scanner.setBeepEnabled(false);
+                scanner.setOrientationLocked(false);
+                scanner.initiateScan();
+            });
+        }
         @JavascriptInterface public void shareText(String text) {
             activity.runOnUiThread(() -> {
                 Intent send = new Intent(Intent.ACTION_SEND);
@@ -74,6 +87,13 @@ public class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        IntentResult scanResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+        if (scanResult != null) {
+            if (scanResult.getContents() != null && webView != null) {
+                webView.evaluateJavascript("window.onCameraBarcodeScanned(" + JSONObject.quote(scanResult.getContents()) + ")", null);
+            }
+            return;
+        }
         if (requestCode == FILE_CHOOSER && fileCallback != null) {
             Uri[] result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
             fileCallback.onReceiveValue(result);
