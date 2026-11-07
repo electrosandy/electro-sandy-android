@@ -490,7 +490,7 @@ public class MainActivity extends FragmentActivity {
         }
         String safeName = fileName == null ? "ELECTRO-Sandy-export.txt" : fileName.replaceAll("[\\\\/:*?\\\"<>|]", "_").trim();
         if (safeName.isEmpty()) safeName = "ELECTRO-Sandy-export.txt";
-        String safeMime = "application/json".equals(mimeType) || "text/csv".equals(mimeType) ? mimeType : "text/plain";
+        String safeMime = "application/json".equals(mimeType) || "text/csv".equals(mimeType) || "application/vnd.ms-excel".equals(mimeType) ? mimeType : "text/plain";
         pendingSaveContent = content;
         pendingSaveFileName = safeName;
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
