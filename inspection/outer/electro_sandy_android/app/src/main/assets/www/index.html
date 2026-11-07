@@ -45,7 +45,7 @@ main{max-width:760px;margin:auto;padding:15px 14px 100px}.page{display:none}.pag
 <section id="purchases" class="page"><div class="section-head"><h2>المشتريات / Achats</h2><button class="secondary" onclick="go('more')">رجوع</button></div><div class="card"><div class="field"><div class="row"><label>المنتج</label><button class="small-action" type="button" onclick="openProductFromPurchase()">＋ منتج جديد مع صورة</button></div><select id="purchaseProduct"></select><small class="muted">يمكنك إضافة منتج جديد وتحميل صورته مباشرة من هنا.</small></div><div class="field"><label>الكمية</label><input id="purchaseQty" type="number" min="1" value="1"></div><div class="field"><label>ثمن الشراء للوحدة (DH)</label><input id="purchasePrice" type="number" min="0" value="0"></div><button class="primary" style="width:100%" onclick="addPurchase()">تسجيل المشتريات وإضافة للمخزون المركزي</button></div><div class="card" id="purchaseHistory">لا توجد مشتريات مسجلة</div></section>
 <section id="cash" class="page"><div class="section-head"><h2>الصندوق / Caisse</h2><button class="secondary" onclick="go('more')">رجوع</button></div><div class="card"><div class="field"><label>نوع العملية</label><select id="cashType"><option value="in">مداخيل</option><option value="out">مصاريف</option></select></div><div class="field"><label>البيان</label><input id="cashNote" placeholder="مثال: مصاريف النقل"></div><div class="field"><label>المبلغ (DH)</label><input id="cashAmount" type="number" min="1" value="1"></div><button class="primary" style="width:100%" onclick="addCashEntry()">حفظ العملية</button></div><div class="card" id="cashHistory"></div></section>
 <section id="reports" class="page"><div class="section-head"><h2>التقارير / Rapports</h2><button class="secondary" onclick="go('more')">رجوع</button></div><div class="grid"><div class="card stat"><span>إجمالي المبيعات</span><strong id="reportSales">0 DH</strong></div><div class="card stat"><span>عدد الطلبات</span><strong id="reportOrders">0</strong></div><div class="card stat"><span>قيمة المخزون</span><strong id="reportStock">0 DH</strong></div><div class="card stat"><span>عدد الزبناء</span><strong id="reportCustomers">0</strong></div></div></section>
-<section id="sellerProfile" class="page"><div class="section-head"><h2>معلومات البائع والشركة</h2><button class="secondary" onclick="go('more')">رجوع</button></div><div class="card"><div class="notice">المعلومات هنا ستظهر في ترويسة الفواتير الجديدة. كل فاتورة تحتافظ بنسخة من معلومات الشركة وقت إصدارها.</div><div class="field"><label>اسم الشركة / المحل</label><input id="sellerCompany" placeholder="ELECTRO Sandy"></div><div class="field"><label>اسم البائع</label><input id="sellerName" placeholder="اسم المسؤول أو البائع"></div><div class="field"><label>رقم الهاتف</label><input id="sellerPhone" type="tel" placeholder="06XXXXXXXX"></div><div class="field"><label>العنوان</label><input id="sellerAddress" placeholder="المدينة والعنوان"></div><div class="field"><label>المعرّف الضريبي أو ICE (اختياري)</label><input id="sellerIce" placeholder="ICE / IF"></div><button class="primary" style="width:100%" onclick="saveSellerProfile()">حفظ معلومات البائع والشركة</button></div></section><section id="settings" class="page"><div class="section-head"><h2>الإعدادات / Paramètres</h2><button class="secondary" onclick="go('more')">رجوع</button></div><div class="card"><button class="secondary" style="width:100%;margin-bottom:9px" onclick="toggleLang()">تغيير اللغة العربية / Français</button><button class="secondary" style="width:100%;margin-bottom:9px" onclick="exportBackup()">تصدير نسخة احتياطية</button><button class="secondary" style="width:100%" onclick="toast('البيانات محفوظة على هذا الجهاز')">حالة حفظ البيانات</button></div></section>
+<section id="sellerProfile" class="page"><div class="section-head"><h2>معلومات البائع والشركة</h2><button class="secondary" onclick="go('more')">رجوع</button></div><div class="card"><div class="notice">المعلومات هنا ستظهر في ترويسة الفواتير الجديدة. كل فاتورة تحتافظ بنسخة من معلومات الشركة وقت إصدارها.</div><div class="field"><label>اسم الشركة / المحل</label><input id="sellerCompany" placeholder="ELECTRO Sandy"></div><div class="field"><label>اسم البائع</label><input id="sellerName" placeholder="اسم المسؤول أو البائع"></div><div class="field"><label>رقم الهاتف</label><input id="sellerPhone" type="tel" placeholder="06XXXXXXXX"></div><div class="field"><label>العنوان</label><input id="sellerAddress" placeholder="المدينة والعنوان"></div><div class="field"><label>المعرّف الضريبي أو ICE (اختياري)</label><input id="sellerIce" placeholder="ICE / IF"></div><button class="primary" style="width:100%" onclick="saveSellerProfile()">حفظ معلومات البائع والشركة</button></div></section><section id="settings" class="page"><div class="section-head"><h2>الإعدادات / Paramètres</h2><button class="secondary" onclick="go('more')">رجوع</button></div><div class="card"><button class="secondary" style="width:100%;margin-bottom:9px" onclick="toggleLang()">تغيير اللغة العربية / Français</button><button class="secondary" style="width:100%;margin-bottom:9px" onclick="exportBackup()">تصدير نسخة احتياطية</button><div class="field"><label>استرجاع نسخة احتياطية JSON</label><input id="backupFile" type="file" accept=".json,application/json" onchange="importBackup(this.files&&this.files[0])"><small class="muted">الاسترجاع يستبدل بيانات التطبيق الحالية بالبيانات الموجودة في النسخة المختارة.</small></div><button class="secondary" style="width:100%" onclick="showBackupStatus()">حالة حفظ البيانات</button></div></section>
 </main><div id="photoPreview" class="photo-preview"></div>
 <nav class="bottom"><button class="active" data-go="home" onclick="go('home')"><span>⌂</span><span class="langar">الرئيسية</span><span class="langfr">Accueil</span></button><button data-go="sale" onclick="go('sale')"><span>＋</span><span class="langar">بيع</span><span class="langfr">Vente</span></button><button data-go="invoices" onclick="go('invoices')"><span>🧾</span><span class="langar">المبيعات</span><span class="langfr">Ventes</span></button><button data-go="stock" onclick="go('stock')"><span>▦</span><span class="langar">المخزون</span><span class="langfr">Stock</span></button><button data-go="customers" onclick="go('customers')"><span>♙</span><span class="langar">الزبناء</span><span class="langfr">Clients</span></button><button data-go="more" onclick="go('more')"><span>•••</span><span class="langar">المزيد</span><span class="langfr">Plus</span></button></nav>
 <div class="toast" id="toast"></div>
@@ -120,7 +120,49 @@ function addCashEntry(){let amount=+document.getElementById('cashAmount').value,
 function renderReports(){document.getElementById('reportSales').textContent=orders.reduce((a,o)=>a+o.total,0)+' DH';document.getElementById('reportOrders').textContent=orders.length;document.getElementById('reportStock').textContent=products.reduce((a,p)=>a+p.price*(p.central+p.van1+p.van2),0)+' DH';document.getElementById('reportCustomers').textContent=customers.length}
 function renderSellerProfile(){document.getElementById('sellerCompany').value=sellerProfile.company||'';document.getElementById('sellerName').value=sellerProfile.name||'';document.getElementById('sellerPhone').value=sellerProfile.phone||'';document.getElementById('sellerAddress').value=sellerProfile.address||'';document.getElementById('sellerIce').value=sellerProfile.ice||''}
 function saveSellerProfile(){sellerProfile={company:document.getElementById('sellerCompany').value.trim(),name:document.getElementById('sellerName').value.trim(),phone:document.getElementById('sellerPhone').value.trim(),address:document.getElementById('sellerAddress').value.trim(),ice:document.getElementById('sellerIce').value.trim()};localStorage.setItem('es13_seller_profile',JSON.stringify(sellerProfile));toast('تم حفظ معلومات البائع والشركة')}
-function exportBackup(){let data={products,orders,customers,purchases,cashEntries,sellerProfile};let blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='ELECTRO-Sandy-backup.json';a.click();URL.revokeObjectURL(a.href)}
+function exportBackup(){
+ const backup={app:'ELECTRO Sandy',schemaVersion:1,createdAt:new Date().toISOString(),data:{products,orders,customers,purchases,cashEntries,sellerProfile}};
+ const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='ELECTRO-Sandy-backup-'+new Date().toISOString().slice(0,10)+'.json';
+ document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ toast('تم تجهيز النسخة الاحتياطية');
+}
+function importBackup(file){
+ if(!file)return;
+ const input=document.getElementById('backupFile');
+ if(file.size>20*1024*1024){toast('حجم ملف النسخة أكبر من 20MB');if(input)input.value='';return}
+ const reader=new FileReader();
+ reader.onerror=()=>{toast('تعذر قراءة ملف النسخة');if(input)input.value=''};
+ reader.onload=()=>{
+  try{
+   const parsed=JSON.parse(String(reader.result||''));
+   const d=parsed&&parsed.data?parsed.data:parsed;
+   const arrayKeys=['products','orders','customers','purchases','cashEntries'];
+   for(const k of arrayKeys){if(!Array.isArray(d[k]))throw new Error('ملف النسخة ناقص أو غير صالح: '+k)}
+   if(!d.sellerProfile||typeof d.sellerProfile!=='object'||Array.isArray(d.sellerProfile))throw new Error('معلومات البائع غير موجودة في النسخة');
+   if(!confirm('تأكيد الاسترجاع؟ سيتم تعويض البيانات الحالية بالبيانات الموجودة في النسخة الاحتياطية.')){if(input)input.value='';return}
+   const keys=['es13_products','es13_orders','es13_customers','es13_purchases','es13_cash','es13_seller_profile'];
+   const values=[d.products,d.orders,d.customers,d.purchases,d.cashEntries,d.sellerProfile];
+   const previous=keys.map(k=>localStorage.getItem(k));
+   try{
+    keys.forEach((k,i)=>localStorage.setItem(k,JSON.stringify(values[i])));
+   }catch(writeError){
+    keys.forEach((k,i)=>{if(previous[i]===null)localStorage.removeItem(k);else localStorage.setItem(k,previous[i])});
+    throw writeError;
+   }
+   products=d.products;orders=d.orders;customers=d.customers;purchases=d.purchases;cashEntries=d.cashEntries;sellerProfile=d.sellerProfile;cart={};
+   renderSaleProducts();renderCart();renderProducts();renderHomeProducts();renderStock();renderTransfer();renderCustomerSelect();renderCustomers();refresh();
+   toast('تم استرجاع النسخة الاحتياطية بنجاح');
+  }catch(e){toast(e&&e.message?e.message:'ملف النسخة غير صالح')}
+  finally{if(input)input.value=''}
+ };
+ reader.readAsText(file);
+}
+function showBackupStatus(){
+ const bytes=['es13_products','es13_orders','es13_customers','es13_purchases','es13_cash','es13_seller_profile'].reduce((n,k)=>n+(localStorage.getItem(k)||'').length,0);
+ toast('البيانات محفوظة محلياً • الحجم التقريبي '+Math.round(bytes/1024)+' KB');
+}
 function refresh(){renderHomeProducts();let total=orders.reduce((s,o)=>s+o.total,0);document.getElementById('todaySales').textContent=total+' DH';document.getElementById('ordersCount').textContent=orders.length;document.getElementById('lowCount').textContent=products.filter(p=>p.central+p.van1+p.van2<=3).length;document.getElementById('customerCount').textContent=customers.length;document.getElementById('recent').innerHTML=orders.slice(0,5).map(o=>`<div class="listrow"><div class="avatar">🧾</div><div class="grow"><b>${o.customer}</b><small>${o.date}</small></div><b>${o.total} DH</b></div>`).join('')||'<div class="empty">لا توجد عمليات بعد. جرّب تسجيل عملية بيع.</div>'}
 renderSaleProducts();renderCart();renderProducts();renderHomeProducts();renderStock();renderTransfer();renderCustomerSelect();renderCustomers();refresh();
 </script></body></html>
