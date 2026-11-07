@@ -202,14 +202,64 @@ public class MainActivity extends FragmentActivity {
                     categories.add(category);
                 }
                 if (categories.size() != 12) throw new IllegalArgumentException("قائمة أقسام النسخة غير مكتملة");
-                Map<String,Object> pointer = new HashMap<>();
-                pointer.put("snapshotId", snapshotId);
-                pointer.put("categories", categories);
-                pointer.put("updatedAt", System.currentTimeMillis());
-                FirebaseFirestore.getInstance().collection("shops").document(uid)
-                    .collection("snapshotMeta").document("current").set(pointer)
-                    .addOnSuccessListener(v -> sendCloudJs("window.onCloudSnapshotCommitted(true,'')"))
-                    .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")"));
+                AtomicInteger verifiedCount = new AtomicInteger(0);
+                AtomicBoolean failed = new AtomicBoolean(false);
+                for (String category : categories) {
+                    FirebaseFirestore.getInstance().collection("shops").document(uid)
+                        .collection("snapshots").document(snapshotId).collection("meta").document(category).get()
+                        .addOnSuccessListener(meta -> {
+                            if (!meta.exists()) {
+                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'بيانات قسم غير مكتملة: '+"
+                                    + JSONObject.quote(category) + ")");
+                                return;
+                            }
+                            Long countValue = meta.getLong("chunkCount");
+                            int count = countValue == null ? 0 : countValue.intValue();
+                            if (count < 1 || count > 10000) {
+                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'عدد أجزاء غير صالح')");
+                                return;
+                            }
+                            FirebaseFirestore.getInstance().collection("shops").document(uid)
+                                .collection("snapshots").document(snapshotId).collection("data").document(category).collection("chunks").get()
+                                .addOnSuccessListener(chunks -> {
+                                    if (chunks.size() != count) {
+                                        if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'أجزاء النسخة غير مكتملة')");
+                                        return;
+                                    }
+                                    java.util.HashSet<Integer> indexes = new java.util.HashSet<>();
+                                    for (QueryDocumentSnapshot chunk : chunks) {
+                                        Long indexValue = chunk.getLong("index");
+                                        String data = chunk.getString("data");
+                                        if (indexValue == null || indexValue < 0 || indexValue >= count || data == null || data.length() > 100000
+                                            || !String.format(Locale.US,"%06d",indexValue.intValue()).equals(chunk.getId())
+                                            || !indexes.add(indexValue.intValue())) {
+                                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'جزء غير صالح داخل النسخة')");
+                                            return;
+                                        }
+                                    }
+                                    if (indexes.size() != count) {
+                                        if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'هناك أجزاء ناقصة داخل النسخة')");
+                                        return;
+                                    }
+                                    if (verifiedCount.incrementAndGet() == categories.size() && !failed.get()) {
+                                        Map<String,Object> pointer = new HashMap<>();
+                                        pointer.put("snapshotId", snapshotId);
+                                        pointer.put("categories", categories);
+                                        pointer.put("updatedAt", System.currentTimeMillis());
+                                        FirebaseFirestore.getInstance().collection("shops").document(uid)
+                                            .collection("snapshotMeta").document("current").set(pointer)
+                                            .addOnSuccessListener(v -> sendCloudJs("window.onCloudSnapshotCommitted(true,'')"))
+                                            .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")"));
+                                    }
+                                })
+                                .addOnFailureListener(e -> {
+                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")");
+                                });
+                        })
+                        .addOnFailureListener(e -> {
+                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")");
+                        });
+                }
             } catch (Exception e) {
                 sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")");
             }
