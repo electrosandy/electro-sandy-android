@@ -145,8 +145,8 @@ public class MainActivity extends FragmentActivity {
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful() && task.getResult() != null && task.getResult().getUser() != null) {
                         String uid = task.getResult().getUser().getUid();
-                        watchCloudSnapshot(uid);
                         sendCloudJs("window.onCloudAuthResult(true,'تم تسجيل الدخول إلى حساب المزامنة',"+JSONObject.quote(uid)+")");
+                        watchCloudSnapshot(uid);
                     } else {
                         String message = task.getException() == null ? "تعذر تسجيل الدخول" : task.getException().getMessage();
                         sendCloudJs("window.onCloudAuthResult(false,"+JSONObject.quote(message)+",'')");
@@ -156,8 +156,8 @@ public class MainActivity extends FragmentActivity {
         @JavascriptInterface public void cloudCheckAuth() {
             if (FirebaseAuth.getInstance().getCurrentUser() != null) {
                 String uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
-                watchCloudSnapshot(uid);
                 sendCloudJs("window.onCloudAuthResult(true,'جلسة المزامنة محفوظة',"+JSONObject.quote(uid)+")");
+                watchCloudSnapshot(uid);
             }
         }
         @JavascriptInterface public void cloudSignOut() {
