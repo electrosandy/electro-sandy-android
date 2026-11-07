@@ -6,6 +6,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebViewClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.ValueCallback;
 import android.content.Intent;
 import android.net.Uri;
@@ -432,6 +433,9 @@ public class MainActivity extends FragmentActivity {
         webView.addJavascriptInterface(bridge, "AndroidVoice");
         webView.addJavascriptInterface(bridge, "AndroidBiometric");
         webView.setWebViewClient(new WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return shouldOverrideUrlLoading(view, request == null || request.getUrl() == null ? null : request.getUrl().toString());
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 if (url == null) return true;
                 if (url.startsWith("file:///android_asset/")) return false;
