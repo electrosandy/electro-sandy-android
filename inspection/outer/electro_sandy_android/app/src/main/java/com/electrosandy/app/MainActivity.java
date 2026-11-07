@@ -28,6 +28,8 @@ import com.google.firebase.firestore.ListenerRegistration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Locale;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -55,6 +57,12 @@ public class MainActivity extends FragmentActivity {
                     sendCloudJs("window.onCloudRemoteSnapshotChanged("+JSONObject.quote(snapshotId == null ? "" : snapshotId)+")");
                 });
         }
+        @JavascriptInterface public void saveTextFile(String fileName, String content, String mimeType) {
+            if (!(activity instanceof MainActivity)) return;
+            MainActivity main = (MainActivity) activity;
+            main.runOnUiThread(() -> main.beginSaveTextFile(fileName, content, mimeType));
+        }
+
         @JavascriptInterface public void authenticateBiometric() {
             activity.runOnUiThread(() -> {
                 if (!(activity instanceof MainActivity)) return;
@@ -416,6 +424,9 @@ public class MainActivity extends FragmentActivity {
     private ValueCallback<Uri[]> fileCallback;
     private static final int FILE_CHOOSER = 1001;
     private static final int VOICE_SEARCH = 1002;
+    private static final int FILE_SAVE = 1003;
+    private String pendingSaveContent;
+    private String pendingSaveFileName;
 
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -472,8 +483,66 @@ public class MainActivity extends FragmentActivity {
         if (webView != null) webView.evaluateJavascript("window.toast && window.toast('خدمة البحث الصوتي غير متاحة على هذا الجهاز')", null);
     }
 
+    private void beginSaveTextFile(String fileName, String content, String mimeType) {
+        if (pendingSaveContent != null || content == null) {
+            notifyFileSaveResult(false, "error");
+            return;
+        }
+        String safeName = fileName == null ? "ELECTRO-Sandy-export.txt" : fileName.replaceAll("[\\\\/:*?\\\"<>|]", "_").trim();
+        if (safeName.isEmpty()) safeName = "ELECTRO-Sandy-export.txt";
+        String safeMime = "application/json".equals(mimeType) || "text/csv".equals(mimeType) ? mimeType : "text/plain";
+        pendingSaveContent = content;
+        pendingSaveFileName = safeName;
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType(safeMime);
+        intent.putExtra(Intent.EXTRA_TITLE, safeName);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        try {
+            startActivityForResult(intent, FILE_SAVE);
+        } catch (Exception e) {
+            pendingSaveContent = null;
+            pendingSaveFileName = null;
+            notifyFileSaveResult(false, "error");
+        }
+    }
+
+    private void notifyFileSaveResult(boolean success, String result) {
+        if (webView == null) return;
+        String script = "window.onNativeFileSaved && window.onNativeFileSaved(" + success + "," + JSONObject.quote(result == null ? "" : result) + ")";
+        runOnUiThread(() -> {
+            if (webView != null) webView.evaluateJavascript(script, null);
+        });
+    }
+
+    private void writePendingTextFile(Uri uri) {
+        final String content = pendingSaveContent;
+        final String fileName = pendingSaveFileName;
+        pendingSaveContent = null;
+        pendingSaveFileName = null;
+        if (uri == null || content == null) {
+            notifyFileSaveResult(false, "cancelled");
+            return;
+        }
+        new Thread(() -> {
+            try (OutputStream output = getContentResolver().openOutputStream(uri, "w")) {
+                if (output == null) throw new IllegalStateException("تعذر فتح الملف");
+                output.write(content.getBytes(StandardCharsets.UTF_8));
+                output.flush();
+                notifyFileSaveResult(true, fileName);
+            } catch (Exception e) {
+                notifyFileSaveResult(false, "error");
+            }
+        }, "ELECTRO-Sandy-FileSave").start();
+    }
+
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == FILE_SAVE) {
+            Uri uri = resultCode == RESULT_OK && data != null ? data.getData() : null;
+            writePendingTextFile(uri);
+            return;
+        }
         if (requestCode == VOICE_SEARCH) {
             if (resultCode == RESULT_OK && data != null && webView != null) {
                 ArrayList<String> matches = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
@@ -496,6 +565,8 @@ public class MainActivity extends FragmentActivity {
     }
 
     @Override protected void onDestroy() {
+        pendingSaveContent = null;
+        pendingSaveFileName = null;
         if (bridge != null) bridge.cleanup();
         if (webView != null) {
             webView.stopLoading();
