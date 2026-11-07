@@ -643,7 +643,7 @@ function saveTextFile(fileName,content,mimeType){
  let blob=new Blob([String(content??'')],{type:(mimeType||'text/plain')+';charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
  a.href=url;a.download=fileName||'ELECTRO-Sandy-export.txt';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('تم تجهيز الملف');return true
 }
-function onNativeFileSaved(ok,result){if(ok)toast('تم حفظ الملف: '+String(result||''));else if(result==='error')toast('تعذر حفظ الملف؛ حاول مرة أخرى')}
+function onNativeFileSaved(ok,result){let fr=document.body.classList.contains('fr');if(ok)toast((fr?'File saved: ':'تم حفظ الملف: ')+String(result||''));else if(result==='error')toast(fr?'Unable to save the file. Try again.':'تعذر حفظ الملف؛ حاول مرة أخرى')}
 function exportBackup(){
  if(!requireRole('admin'))return;
  const backup={app:'ELECTRO Sandy',schemaVersion:1,createdAt:new Date().toISOString(),data:{products,orders,customers,purchases,cashEntries,cashClosings,stockAudits,activityLog,warranties,users:appUsers,suppliers,returns,sellerProfile}};
@@ -724,18 +724,19 @@ let days=[];for(let n=6;n>=0;n--){let d=new Date(start);d.setDate(start.getDate(
 let alerts=[];low.slice(0,5).forEach(p=>alerts.push({icon:'📦',label:'مخزون منخفض: '+p.name,meta:(Number(p.central||0)+Number(p.van1||0)+Number(p.van2||0))+' متوفر',go:'stock'}));let debts=orders.filter(o=>Number(o.balance??(String(o.payment||'').includes('دين')?o.total:0))>0);if(debts.length)alerts.push({icon:'💳',label:'فواتير فيها مبالغ متبقية',meta:debts.length+' فاتورة',go:'reports'});let expiring=warranties.filter(w=>w.status!=='returned'&&new Date(w.expiresAt).getTime()>=Date.now()&&new Date(w.expiresAt).getTime()<=Date.now()+30*86400000);if(expiring.length)alerts.push({icon:'🛡️',label:'ضمانات قريبة من الانتهاء',meta:expiring.length+' ضمان خلال 30 يوم',go:'warranties'});let lastBackup=Number(localStorage.getItem('es13_last_auto_backup')||0);if(!lastBackup||Date.now()-lastBackup>7*86400000)alerts.push({icon:'💾',label:'تذكير بالنسخ الاحتياطي الخارجي',meta:'صدّر نسخة JSON واحتفظ بها خارج الجهاز',go:'settings'});if(!alerts.length)alerts.push({icon:'✓',label:'كل شيء على ما يرام',meta:'لا توجد تنبيهات',go:''});put('premiumAlertCount',alerts.filter(a=>a.icon!=='✓').length);let box=document.getElementById('premiumAlerts');if(box)box.innerHTML=alerts.slice(0,6).map(a=>'<div class="premium-alert" '+(a.go?'onclick="go(\''+a.go+'\')" style="cursor:pointer"':'')+'><span class="premium-alert-icon">'+a.icon+'</span><b>'+statementEscape(a.label)+'</b><span>'+statementEscape(a.meta)+'</span></div>').join('')}
 function renderReps(){
  let el=document.getElementById('repList');if(!el)return;
- let names=[...new Set([...appUsers.filter(u=>u.role==='seller').map(u=>String(u.name||'')),...orders.filter(o=>o.sellerUserRole==='seller').map(o=>String(o.sellerUserName||''))].filter(Boolean))];
- let rows=names.map(name=>{
+ let fr=document.body.classList.contains('fr'),
+ names=[...new Set([...appUsers.filter(u=>u.role==='seller').map(u=>String(u.name||'')),...orders.filter(o=>o.sellerUserRole==='seller').map(o=>String(o.sellerUserName||''))].filter(Boolean))],
+ rows=names.map(name=>{
   let user=appUsers.find(u=>u.role==='seller'&&String(u.name||'')===name),
       sales=orders.filter(o=>o.sellerUserName===name||(!o.sellerUserName&&user&&Number(o.sellerUserId)===Number(user.id))),
       revenue=sales.reduce((a,o)=>{let n=Number(o.total||0)-Number(o.returnedAmount||0);return a+(Number.isFinite(n)?Math.max(0,n):0)},0),
       debt=sales.reduce((a,o)=>{let n=Number(o.balance||0);return a+(Number.isFinite(n)?Math.max(0,n):0)},0),
-      status=user?(user.active===false?'حساب موقوف':'حساب نشط'):'مندوب مسجل على جهاز آخر';
-  return '<div class="listrow"><div class="avatar">👤</div><div class="grow"><b>'+statementEscape(name)+'</b><small>'+status+' • '+sales.length+' فاتورة</small><small>المبيعات الصافية: '+revenue.toFixed(2)+' DH • ديون الزبناء: '+debt.toFixed(2)+' DH</small></div></div>'
+      status=user?(user.active===false?(fr?'Account disabled':'حساب موقوف'):(fr?'Active account':'حساب نشط')):(fr?'Recorded on another device':'مندوب مسجل على جهاز آخر');
+  return '<div class="listrow"><div class="avatar">👤</div><div class="grow"><b>'+statementEscape(name)+'</b><small>'+status+' • '+sales.length+' '+(fr?'invoices':'فاتورة')+'</small><small>'+(fr?'Net sales: ':'المبيعات الصافية: ')+revenue.toFixed(2)+' DH • '+(fr?'Customer debts: ':'ديون الزبناء: ')+debt.toFixed(2)+' DH</small></div></div>'
  }).join('');
  let unassigned=orders.filter(o=>!o.sellerUserRole||o.sellerUserRole==='seller'&&!o.sellerUserName).length;
- el.innerHTML=rows||'<div class="empty">لا توجد حسابات مندوبين. أضف مستخدماً بدور بائع من إدارة المستخدمين.</div>';
- if(unassigned)el.innerHTML+='<div class="notice" style="margin-top:10px">'+unassigned+' فاتورة قديمة أو غير منسوبة إلى مندوب.</div>'
+ el.innerHTML=rows||(fr?'<div class="empty">No seller accounts. Add a user with the Seller role in User Management.</div>':'<div class="empty">لا توجد حسابات مندوبين. أضف مستخدماً بدور بائع من إدارة المستخدمين.</div>');
+ if(unassigned)el.innerHTML+='<div class="notice" style="margin-top:10px">'+unassigned+(fr?' older or unassigned invoices.':' فاتورة قديمة أو غير منسوبة إلى مندوب.')+'</div>'
 }
 function refresh(){renderPremiumDashboard();renderNotifications();renderHomeProducts();renderReps();let total=orders.reduce((s,o)=>s+Math.max(0,Number(o.total||0)-Number(o.returnedAmount||0)),0);document.getElementById('todaySales').textContent=total+' DH';document.getElementById('ordersCount').textContent=orders.length;document.getElementById('lowCount').textContent=products.filter(p=>Number(p.central||0)+Number(p.van1||0)+Number(p.van2||0)<=Number(p.minStock??3)).length;document.getElementById('customerCount').textContent=customers.length;document.getElementById('recent').innerHTML=orders.slice(0,5).map(o=>`<div class="listrow"><div class="avatar">🧾</div><div class="grow"><b>${statementEscape(o.customer)}</b><small>${statementEscape(o.date||'')}</small></div><b>${Math.max(0,Number(o.total||0)-Number(o.returnedAmount||0)).toFixed(2)} DH</b></div>`).join('')||'<div class="empty">لا توجد عمليات بعد. جرّب تسجيل عملية بيع.</div>'}
 
