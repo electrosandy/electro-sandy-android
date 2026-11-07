@@ -181,7 +181,7 @@ public class MainActivity extends FragmentActivity {
                                     String data = chunk.getString("data");
                                     Long index = chunk.getLong("index");
                                     if (data != null && index != null && index >= 0 && index < count) {
-                                        sendCloudJs("window.onCloudChunkReceived("+JSONObject.quote(category)+","+index+","+JSONObject.quote(data)+")");
+                                        sendCloudJs("window.onCloudChunkReceived("+JSONObject.quote(category)+","+index+","+count+","+JSONObject.quote(data)+")");
                                     }
                                 }
                                 if (completed.incrementAndGet() == total) sendCloudJs("window.onCloudDownloadComplete(true)");
