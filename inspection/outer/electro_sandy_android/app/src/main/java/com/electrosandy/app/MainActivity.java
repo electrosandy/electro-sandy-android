@@ -256,7 +256,7 @@ public class MainActivity extends FragmentActivity {
                                 Long countValue = metaDoc.getLong("chunkCount");
                                 int count = countValue == null ? 0 : countValue.intValue();
                                 if (count < 1 || count > 10000) {
-                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError('عدد أجزاء غير صالح: '+category)");
+                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("عدد أجزاء غير صالح: "+category)+")");
                                     return;
                                 }
                                 db.collection("shops").document(uid).collection("snapshots").document(snapshotId)
