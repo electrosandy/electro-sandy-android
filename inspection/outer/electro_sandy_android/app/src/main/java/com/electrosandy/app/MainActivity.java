@@ -133,8 +133,8 @@ public class MainActivity extends FragmentActivity {
             FirebaseAuth.getInstance().signOut();
             sendCloudJs("window.onCloudSignedOut && window.onCloudSignedOut()");
         }
-        @JavascriptInterface public void cloudWriteChunk(String category, int index, String data) {
-            String uid = (FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid());
+        @JavascriptInterface public void cloudWriteChunk(String snapshotId, String category, int index, String data) {
+            String uid = FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid();
             if (uid == null) {
                 sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",false,'سجل الدخول أولاً')");
                 return;
@@ -144,13 +144,14 @@ public class MainActivity extends FragmentActivity {
             chunk.put("data", data == null ? "" : data);
             chunk.put("updatedAt", System.currentTimeMillis());
             FirebaseFirestore.getInstance().collection("shops").document(uid)
-                .collection("snapshots").document(category).collection("chunks")
+                .collection("snapshots").document(snapshotId).collection("data")
+                .document(category).collection("chunks")
                 .document(String.format(Locale.US,"%06d",index)).set(chunk)
                 .addOnSuccessListener(v -> sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",true,'')"))
                 .addOnFailureListener(e -> sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",false,"+JSONObject.quote(e.getMessage())+")"));
         }
-        @JavascriptInterface public void cloudFinishCategory(String category, int count) {
-            String uid = (FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid());
+        @JavascriptInterface public void cloudFinishCategory(String snapshotId, String category, int count) {
+            String uid = FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid();
             if (uid == null) {
                 sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",false,'سجل الدخول أولاً')");
                 return;
@@ -159,45 +160,97 @@ public class MainActivity extends FragmentActivity {
             meta.put("chunkCount", count);
             meta.put("updatedAt", System.currentTimeMillis());
             FirebaseFirestore.getInstance().collection("shops").document(uid)
-                .collection("snapshotMeta").document(category).set(meta)
+                .collection("snapshots").document(snapshotId).collection("meta")
+                .document(category).set(meta)
                 .addOnSuccessListener(v -> sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",true,'')"))
                 .addOnFailureListener(e -> sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",false,"+JSONObject.quote(e.getMessage())+")"));
         }
+        @JavascriptInterface public void cloudCommitSnapshot(String snapshotId, String categoriesJson) {
+            String uid = FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid();
+            if (uid == null) {
+                sendCloudJs("window.onCloudSnapshotCommitted(false,'سجل الدخول أولاً')");
+                return;
+            }
+            try {
+                org.json.JSONArray parsed = new org.json.JSONArray(categoriesJson == null ? "[]" : categoriesJson);
+                java.util.ArrayList<String> categories = new java.util.ArrayList<>();
+                for (int i = 0; i < parsed.length(); i++) categories.add(parsed.getString(i));
+                if (categories.isEmpty()) throw new IllegalArgumentException("لا توجد أقسام للنسخة");
+                Map<String,Object> pointer = new HashMap<>();
+                pointer.put("snapshotId", snapshotId);
+                pointer.put("categories", categories);
+                pointer.put("updatedAt", System.currentTimeMillis());
+                FirebaseFirestore.getInstance().collection("shops").document(uid)
+                    .collection("snapshotMeta").document("current").set(pointer)
+                    .addOnSuccessListener(v -> sendCloudJs("window.onCloudSnapshotCommitted(true,'')"))
+                    .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")"));
+            } catch (Exception e) {
+                sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")");
+            }
+        }
         @JavascriptInterface public void cloudDownloadSnapshot() {
-            String uid = (FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid());
+            String uid = FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid();
             if (uid == null) {
                 sendCloudJs("window.onCloudDownloadError('سجل الدخول أولاً')");
                 return;
             }
             FirebaseFirestore db = FirebaseFirestore.getInstance();
-            db.collection("shops").document(uid).collection("snapshotMeta").get()
-                .addOnSuccessListener(metaSnapshot -> {
-                    int total = metaSnapshot.size();
-                    if (total == 0) {
+            db.collection("shops").document(uid).collection("snapshotMeta").document("current").get()
+                .addOnSuccessListener(pointerDoc -> {
+                    if (!pointerDoc.exists()) {
                         sendCloudJs("window.onCloudDownloadComplete(false)");
+                        return;
+                    }
+                    String snapshotId = pointerDoc.getString("snapshotId");
+                    Object rawCategories = pointerDoc.get("categories");
+                    if (snapshotId == null || !(rawCategories instanceof java.util.List)) {
+                        sendCloudJs("window.onCloudDownloadError('مؤشر النسخة السحابية غير صالح')");
+                        return;
+                    }
+                    java.util.List<?> categories = (java.util.List<?>) rawCategories;
+                    if (categories.isEmpty() || categories.size() > 30) {
+                        sendCloudJs("window.onCloudDownloadError('قائمة أقسام النسخة غير صالحة')");
                         return;
                     }
                     AtomicInteger completed = new AtomicInteger(0);
                     AtomicBoolean failed = new AtomicBoolean(false);
-                    for (QueryDocumentSnapshot metaDoc : metaSnapshot) {
-                        String category = metaDoc.getId();
-                        Long countValue = metaDoc.getLong("chunkCount");
-                        int count = (int)Math.max(0, Math.min(10000, countValue == null ? 0 : countValue));
-                        db.collection("shops").document(uid).collection("snapshots").document(category).collection("chunks").get()
-                            .addOnSuccessListener(chunks -> {
-                                for (QueryDocumentSnapshot chunk : chunks) {
-                                    String data = chunk.getString("data");
-                                    Long index = chunk.getLong("index");
-                                    if (data != null && index != null && index >= 0 && index < count) {
-                                        sendCloudJs("window.onCloudChunkReceived("+JSONObject.quote(category)+","+index+","+count+","+JSONObject.quote(data)+")");
-                                    }
+                    for (Object rawCategory : categories) {
+                        if (!(rawCategory instanceof String)) {
+                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError('اسم قسم غير صالح')");
+                            continue;
+                        }
+                        String category = (String) rawCategory;
+                        db.collection("shops").document(uid).collection("snapshots").document(snapshotId)
+                            .collection("meta").document(category).get()
+                            .addOnSuccessListener(metaDoc -> {
+                                if (!metaDoc.exists()) {
+                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError('بيانات قسم مفقودة: '+category)");
+                                    return;
                                 }
-                                if (completed.incrementAndGet() == total && !failed.get()) sendCloudJs("window.onCloudDownloadComplete(true)");
+                                Long countValue = metaDoc.getLong("chunkCount");
+                                int count = countValue == null ? 0 : countValue.intValue();
+                                if (count < 1 || count > 10000) {
+                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError('عدد أجزاء غير صالح: '+category)");
+                                    return;
+                                }
+                                db.collection("shops").document(uid).collection("snapshots").document(snapshotId)
+                                    .collection("data").document(category).collection("chunks").get()
+                                    .addOnSuccessListener(chunks -> {
+                                        for (QueryDocumentSnapshot chunk : chunks) {
+                                            String data = chunk.getString("data");
+                                            Long index = chunk.getLong("index");
+                                            if (data != null && index != null && index >= 0 && index < count) {
+                                                sendCloudJs("window.onCloudChunkReceived("+JSONObject.quote(category)+","+index+","+count+","+JSONObject.quote(data)+")");
+                                            }
+                                        }
+                                        if (completed.incrementAndGet() == categories.size() && !failed.get()) sendCloudJs("window.onCloudDownloadComplete(true)");
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+")");
+                                    });
                             })
                             .addOnFailureListener(e -> {
-                                failed.set(true);
-                                sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+")");
-                                completed.incrementAndGet();
+                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+")");
                             });
                     }
                 })
