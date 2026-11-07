@@ -738,6 +738,10 @@ function renderReps(){
  el.innerHTML=rows||(fr?'<div class="empty">No seller accounts. Add a user with the Seller role in User Management.</div>':'<div class="empty">لا توجد حسابات مندوبين. أضف مستخدماً بدور بائع من إدارة المستخدمين.</div>');
  if(unassigned)el.innerHTML+='<div class="notice" style="margin-top:10px">'+unassigned+(fr?' older or unassigned invoices.':' فاتورة قديمة أو غير منسوبة إلى مندوب.')+'</div>'
 }
+function renderActivityLog(){
+ let el=document.getElementById('activityList');if(!el)return;
+ el.innerHTML=activityLog.slice(0,1000).map(x=>'<div class="listrow"><div class="grow"><b>'+statementEscape(x.type||'عملية')+'</b><small>'+statementEscape(x.details||'')+'</small><small>'+statementEscape(x.user||'')+' • '+statementEscape(x.date||x.createdAt||'')+'</small></div></div>').join('')||'<div class="empty">لا توجد عمليات مسجلة بعد</div>'
+}
 function refresh(){renderPremiumDashboard();renderNotifications();renderHomeProducts();renderReps();let total=orders.reduce((s,o)=>s+Math.max(0,Number(o.total||0)-Number(o.returnedAmount||0)),0);document.getElementById('todaySales').textContent=total+' DH';document.getElementById('ordersCount').textContent=orders.length;document.getElementById('lowCount').textContent=products.filter(p=>Number(p.central||0)+Number(p.van1||0)+Number(p.van2||0)<=Number(p.minStock??3)).length;document.getElementById('customerCount').textContent=customers.length;document.getElementById('recent').innerHTML=orders.slice(0,5).map(o=>`<div class="listrow"><div class="avatar">🧾</div><div class="grow"><b>${statementEscape(o.customer)}</b><small>${statementEscape(o.date||'')}</small></div><b>${Math.max(0,Number(o.total||0)-Number(o.returnedAmount||0)).toFixed(2)} DH</b></div>`).join('')||'<div class="empty">لا توجد عمليات بعد. جرّب تسجيل عملية بيع.</div>'}
 
 // Firebase cloud snapshot sync. Credentials, local PINs, users and device preferences are excluded.
