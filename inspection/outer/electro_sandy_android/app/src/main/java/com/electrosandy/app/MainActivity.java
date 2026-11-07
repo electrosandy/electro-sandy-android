@@ -20,6 +20,13 @@ import java.util.ArrayList;
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 import org.json.JSONObject;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class MainActivity extends FragmentActivity {
     private WebView webView;
@@ -94,6 +101,95 @@ public class MainActivity extends FragmentActivity {
                 });
                 printView.loadDataWithBaseURL(null, html == null ? "" : html, "text/html", "UTF-8", null);
             });
+        }
+        private void sendCloudJs(String script) {
+            if (activity instanceof MainActivity) {
+                MainActivity main = (MainActivity) activity;
+                activity.runOnUiThread(() -> {
+                    if (main.webView != null) main.webView.evaluateJavascript(script, null);
+                });
+            }
+        }
+        @JavascriptInterface public void cloudSignIn(String email, String password) {
+            FirebaseAuth.getInstance().signInWithEmailAndPassword(email == null ? "" : email.trim(), password == null ? "" : password)
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null && task.getResult().getUser() != null) {
+                        String uid = task.getResult().getUser().getUid();
+                        sendCloudJs("window.onCloudAuthResult(true,'تم تسجيل الدخول إلى حساب المزامنة',"+JSONObject.quote(uid)+")");
+                    } else {
+                        String message = task.getException() == null ? "تعذر تسجيل الدخول" : task.getException().getMessage();
+                        sendCloudJs("window.onCloudAuthResult(false,"+JSONObject.quote(message)+",'')");
+                    }
+                });
+        }
+        @JavascriptInterface public void cloudSignOut() {
+            FirebaseAuth.getInstance().signOut();
+            sendCloudJs("window.onCloudSignedOut && window.onCloudSignedOut()");
+        }
+        @JavascriptInterface public void cloudWriteChunk(String category, int index, String data) {
+            String uid = FirebaseAuth.getInstance().getUid();
+            if (uid == null) {
+                sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",false,'سجل الدخول أولاً')");
+                return;
+            }
+            Map<String,Object> chunk = new HashMap<>();
+            chunk.put("index", index);
+            chunk.put("data", data == null ? "" : data);
+            chunk.put("updatedAt", System.currentTimeMillis());
+            FirebaseFirestore.getInstance().collection("shops").document(uid)
+                .collection("snapshots").document(category).collection("chunks")
+                .document(String.format(Locale.US,"%06d",index)).set(chunk)
+                .addOnSuccessListener(v -> sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",true,'')"))
+                .addOnFailureListener(e -> sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",false,"+JSONObject.quote(e.getMessage())+")"));
+        }
+        @JavascriptInterface public void cloudFinishCategory(String category, int count) {
+            String uid = FirebaseAuth.getInstance().getUid();
+            if (uid == null) {
+                sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",false,'سجل الدخول أولاً')");
+                return;
+            }
+            Map<String,Object> meta = new HashMap<>();
+            meta.put("chunkCount", count);
+            meta.put("updatedAt", System.currentTimeMillis());
+            FirebaseFirestore.getInstance().collection("shops").document(uid)
+                .collection("snapshotMeta").document(category).set(meta)
+                .addOnSuccessListener(v -> sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",true,'')"))
+                .addOnFailureListener(e -> sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",false,"+JSONObject.quote(e.getMessage())+")"));
+        }
+        @JavascriptInterface public void cloudDownloadSnapshot() {
+            String uid = FirebaseAuth.getInstance().getUid();
+            if (uid == null) {
+                sendCloudJs("window.onCloudDownloadError('سجل الدخول أولاً')");
+                return;
+            }
+            FirebaseFirestore db = FirebaseFirestore.getInstance();
+            db.collection("shops").document(uid).collection("snapshotMeta").get()
+                .addOnSuccessListener(metaSnapshot -> {
+                    int total = metaSnapshot.size();
+                    if (total == 0) {
+                        sendCloudJs("window.onCloudDownloadComplete(false)");
+                        return;
+                    }
+                    AtomicInteger completed = new AtomicInteger(0);
+                    for (QueryDocumentSnapshot metaDoc : metaSnapshot) {
+                        String category = metaDoc.getId();
+                        Long countValue = metaDoc.getLong("chunkCount");
+                        int count = (int)Math.max(0, Math.min(10000, countValue == null ? 0 : countValue));
+                        db.collection("shops").document(uid).collection("snapshots").document(category).collection("chunks").get()
+                            .addOnSuccessListener(chunks -> {
+                                for (QueryDocumentSnapshot chunk : chunks) {
+                                    String data = chunk.getString("data");
+                                    Long index = chunk.getLong("index");
+                                    if (data != null && index != null && index >= 0 && index < count) {
+                                        sendCloudJs("window.onCloudChunkReceived("+JSONObject.quote(category)+","+index+","+JSONObject.quote(data)+")");
+                                    }
+                                }
+                                if (completed.incrementAndGet() == total) sendCloudJs("window.onCloudDownloadComplete(true)");
+                            })
+                            .addOnFailureListener(e -> sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+")"));
+                    }
+                })
+                .addOnFailureListener(e -> sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+")"));
         }
     }
     private ValueCallback<Uri[]> fileCallback;
