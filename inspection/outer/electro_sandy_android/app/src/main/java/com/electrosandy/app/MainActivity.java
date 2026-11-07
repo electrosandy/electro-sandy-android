@@ -10,6 +10,7 @@ import android.webkit.ValueCallback;
 import android.content.Intent;
 import android.net.Uri;
 import android.print.PrintManager;
+import android.print.PrintAttributes;
 import android.content.Context;
 
 public class MainActivity extends Activity {
@@ -24,6 +25,22 @@ public class MainActivity extends Activity {
                 send.setType("text/plain");
                 send.putExtra(Intent.EXTRA_TEXT, text == null ? "" : text);
                 activity.startActivity(Intent.createChooser(send, "مشاركة الفاتورة"));
+            });
+        }
+        @JavascriptInterface public void printHtml(String html, String jobName) {
+            activity.runOnUiThread(() -> {
+                WebView printView = new WebView(activity);
+                printView.setWebViewClient(new WebViewClient() {
+                    @Override public void onPageFinished(WebView view, String url) {
+                        PrintManager manager = (PrintManager) activity.getSystemService(Context.PRINT_SERVICE);
+                        if (manager != null) {
+                            manager.print(jobName == null ? "ELECTRO Sandy" : jobName,
+                                printView.createPrintDocumentAdapter(jobName == null ? "ELECTRO Sandy" : jobName),
+                                new PrintAttributes.Builder().build());
+                        }
+                    }
+                });
+                printView.loadDataWithBaseURL(null, html == null ? "" : html, "text/html", "UTF-8", null);
             });
         }
     }
