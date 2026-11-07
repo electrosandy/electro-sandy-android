@@ -62,7 +62,7 @@ const initial=[
 let products=JSON.parse(localStorage.getItem('es13_products')||'null')||initial;
 let orders=JSON.parse(localStorage.getItem('es13_orders')||'[]'),cart={},homeProductQty={};
 let customers=JSON.parse(localStorage.getItem('es13_customers')||'null')||[{id:1,name:'محمد العلوي',phone:'06 12 34 56 78',address:'الدار البيضاء'},{id:2,name:'متجر النور',phone:'06 22 33 44 55',address:'المحمدية'},{id:3,name:'سارة للإلكترونيات',phone:'06 33 44 55 66',address:'عين السبع'}];
-let purchases=JSON.parse(localStorage.getItem('es13_purchases')||'[]'),cashEntries=JSON.parse(localStorage.getItem('es13_cash')||'[]');
+let purchases=JSON.parse(localStorage.getItem('es13_purchases')||'[]'),cashEntries=JSON.parse(localStorage.getItem('es13_cash')||'[]'),cashClosings=JSON.parse(localStorage.getItem('es13_cash_closings')||'[]');
 let sellerProfile=JSON.parse(localStorage.getItem('es13_seller_profile')||'null')||{company:'ELECTRO Sandy',name:'',phone:'',address:'',ice:''};
 function save(){localStorage.setItem('es13_products',JSON.stringify(products));localStorage.setItem('es13_orders',JSON.stringify(orders));localStorage.setItem('es13_customers',JSON.stringify(customers));localStorage.setItem('es13_purchases',JSON.stringify(purchases));localStorage.setItem('es13_cash',JSON.stringify(cashEntries));localStorage.setItem('es13_seller_profile',JSON.stringify(sellerProfile));refresh()}
 function toast(t){let e=document.getElementById('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2100)}
@@ -121,7 +121,7 @@ function financialSummary(){let sales=orders.reduce((a,o)=>a+Number(o.total||0),
 function renderSellerProfile(){document.getElementById('sellerCompany').value=sellerProfile.company||'';document.getElementById('sellerName').value=sellerProfile.name||'';document.getElementById('sellerPhone').value=sellerProfile.phone||'';document.getElementById('sellerAddress').value=sellerProfile.address||'';document.getElementById('sellerIce').value=sellerProfile.ice||''}
 function saveSellerProfile(){sellerProfile={company:document.getElementById('sellerCompany').value.trim(),name:document.getElementById('sellerName').value.trim(),phone:document.getElementById('sellerPhone').value.trim(),address:document.getElementById('sellerAddress').value.trim(),ice:document.getElementById('sellerIce').value.trim()};localStorage.setItem('es13_seller_profile',JSON.stringify(sellerProfile));toast('تم حفظ معلومات البائع والشركة')}
 function exportBackup(){
- const backup={app:'ELECTRO Sandy',schemaVersion:1,createdAt:new Date().toISOString(),data:{products,orders,customers,purchases,cashEntries,sellerProfile}};
+ const backup={app:'ELECTRO Sandy',schemaVersion:1,createdAt:new Date().toISOString(),data:{products,orders,customers,purchases,cashEntries,cashClosings,sellerProfile}};
  const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
  const url=URL.createObjectURL(blob),a=document.createElement('a');
  a.href=url;a.download='ELECTRO-Sandy-backup-'+new Date().toISOString().slice(0,10)+'.json';
@@ -142,8 +142,8 @@ function importBackup(file){
    for(const k of arrayKeys){if(!Array.isArray(d[k]))throw new Error('ملف النسخة ناقص أو غير صالح: '+k)}
    if(!d.sellerProfile||typeof d.sellerProfile!=='object'||Array.isArray(d.sellerProfile))throw new Error('معلومات البائع غير موجودة في النسخة');
    if(!confirm('تأكيد الاسترجاع؟ سيتم تعويض البيانات الحالية بالبيانات الموجودة في النسخة الاحتياطية.')){if(input)input.value='';return}
-   const keys=['es13_products','es13_orders','es13_customers','es13_purchases','es13_cash','es13_seller_profile'];
-   const values=[d.products,d.orders,d.customers,d.purchases,d.cashEntries,d.sellerProfile];
+   const keys=['es13_products','es13_orders','es13_customers','es13_purchases','es13_cash','es13_cash_closings','es13_seller_profile'];
+   const values=[d.products,d.orders,d.customers,d.purchases,d.cashEntries,Array.isArray(d.cashClosings)?d.cashClosings:[],d.sellerProfile];
    const previous=keys.map(k=>localStorage.getItem(k));
    try{
     keys.forEach((k,i)=>localStorage.setItem(k,JSON.stringify(values[i])));
@@ -151,8 +151,8 @@ function importBackup(file){
     keys.forEach((k,i)=>{if(previous[i]===null)localStorage.removeItem(k);else localStorage.setItem(k,previous[i])});
     throw writeError;
    }
-   products=d.products;orders=d.orders;customers=d.customers;purchases=d.purchases;cashEntries=d.cashEntries;sellerProfile=d.sellerProfile;cart={};
-   renderSaleProducts();renderCart();renderProducts();renderHomeProducts();renderStock();renderTransfer();renderCustomerSelect();renderCustomers();refresh();
+   products=d.products;orders=d.orders;customers=d.customers;purchases=d.purchases;cashEntries=d.cashEntries;cashClosings=Array.isArray(d.cashClosings)?d.cashClosings:[];sellerProfile=d.sellerProfile;cart={};
+   renderSaleProducts();renderCart();renderProducts();renderHomeProducts();renderStock();renderTransfer();renderCustomerSelect();renderCustomers();renderReports();refresh();
    toast('تم استرجاع النسخة الاحتياطية بنجاح');
   }catch(e){toast(e&&e.message?e.message:'ملف النسخة غير صالح')}
   finally{if(input)input.value=''}
@@ -160,7 +160,7 @@ function importBackup(file){
  reader.readAsText(file);
 }
 function showBackupStatus(){
- const bytes=['es13_products','es13_orders','es13_customers','es13_purchases','es13_cash','es13_seller_profile'].reduce((n,k)=>n+(localStorage.getItem(k)||'').length,0);
+ const bytes=['es13_products','es13_orders','es13_customers','es13_purchases','es13_cash','es13_cash_closings','es13_seller_profile'].reduce((n,k)=>n+(localStorage.getItem(k)||'').length,0);
  toast('البيانات محفوظة محلياً • الحجم التقريبي '+Math.round(bytes/1024)+' KB');
 }
 function refresh(){renderHomeProducts();let total=orders.reduce((s,o)=>s+o.total,0);document.getElementById('todaySales').textContent=total+' DH';document.getElementById('ordersCount').textContent=orders.length;document.getElementById('lowCount').textContent=products.filter(p=>p.central+p.van1+p.van2<=3).length;document.getElementById('customerCount').textContent=customers.length;document.getElementById('recent').innerHTML=orders.slice(0,5).map(o=>`<div class="listrow"><div class="avatar">🧾</div><div class="grow"><b>${o.customer}</b><small>${o.date}</small></div><b>${o.total} DH</b></div>`).join('')||'<div class="empty">لا توجد عمليات بعد. جرّب تسجيل عملية بيع.</div>'}
