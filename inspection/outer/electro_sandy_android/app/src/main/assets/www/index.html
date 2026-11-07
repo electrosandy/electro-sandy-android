@@ -180,6 +180,53 @@ body.theme-dark .premium-alert-icon{background:#3b3424}
 body.theme-dark .premium-alert-count{background:#3b3424;color:#e5c982}
 @media(hover:hover){.card:hover,.quick button:hover,.home-product:hover,.premium-kpi:hover,.premium-panel:hover{transform:translateY(-2px);box-shadow:0 13px 30px #10243a16}.bottom button:hover{background:#ffffff10}}
 @media(prefers-reduced-motion:reduce){.page.active{animation:none}.card,.quick button,.home-product,.premium-kpi,.premium-panel,.bottom button{transition:none}}
+
+/* Modal usability: keep primary actions visible above the scrollable form */
+.modalback{padding:10px 0 max(10px,env(safe-area-inset-bottom,0px));}
+.modalback.show{animation:esModalFadeIn .2s ease both}
+.modalback.show .modal{animation:esModalEnter .28s cubic-bezier(.2,.8,.2,1) both}
+.product-modal{
+  width:min(100%,640px);
+  max-height:min(92dvh,900px);
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  padding:16px 18px 0;
+  border-radius:22px 22px 0 0;
+}
+.product-modal-header{flex:0 0 auto;position:relative;z-index:2;padding-bottom:8px}
+.product-modal-fields{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding:2px 2px 16px;
+}
+.product-modal-footer{
+  position:sticky;
+  bottom:0;
+  z-index:3;
+  flex:0 0 auto;
+  margin:0 -18px;
+  padding:12px 18px calc(12px + env(safe-area-inset-bottom,0px));
+  background:var(--card,#fff);
+  border-top:1px solid var(--line,#e5ebf1);
+  box-shadow:0 -8px 20px rgba(12,30,48,.08);
+}
+.product-modal-footer button{display:block;width:100%;min-height:50px;border-radius:14px;font-weight:800}
+@keyframes esModalFadeIn{from{opacity:0}to{opacity:1}}
+@keyframes esModalEnter{from{opacity:.7;transform:translateY(28px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(min-width:650px){
+ .modalback{align-items:center;padding:18px}
+ .product-modal{border-radius:22px;padding-bottom:0;max-height:min(88dvh,850px)}
+ .product-modal-footer{margin:0 -18px;border-radius:0 0 22px 22px}
+}
+@media(prefers-reduced-motion:reduce){
+ .modalback.show,.modalback.show .modal{animation:none!important}
+}
+
 </style>
 </head>
 <body>
