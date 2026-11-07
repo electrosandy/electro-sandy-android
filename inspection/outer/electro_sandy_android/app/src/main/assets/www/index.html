@@ -227,6 +227,13 @@ body.theme-dark .premium-alert-count{background:#3b3424;color:#e5c982}
  .modalback.show,.modalback.show .modal{animation:none!important}
 }
 
+
+/* Product save action: keep it permanently visible and tappable on small screens. */
+.product-modal{display:flex!important;flex-direction:column!important;min-height:0!important;overflow:hidden!important}
+.product-modal-fields{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch}
+.product-modal-footer{display:block!important;flex:0 0 auto!important;position:sticky!important;bottom:0!important;z-index:60!important;visibility:visible!important;opacity:1!important;background:var(--card,#fff)!important;padding:12px 18px calc(14px + env(safe-area-inset-bottom,0px))!important;border-top:1px solid var(--line,#e5ebf1)!important;box-shadow:0 -8px 20px rgba(12,30,48,.12)!important}
+.product-modal-footer button{display:block!important;visibility:visible!important;opacity:1!important;width:100%!important;min-height:56px!important;font-size:17px!important;font-weight:850!important;touch-action:manipulation!important}
+
 </style>
 </head>
 <body>
