@@ -229,22 +229,25 @@ public class MainActivity extends FragmentActivity {
                     }
                     String snapshotId = pointerDoc.getString("snapshotId");
                     Object rawCategories = pointerDoc.get("categories");
-                    if (snapshotId == null || !(rawCategories instanceof java.util.List)) {
+                    if (!isSafeSnapshotId(snapshotId) || !(rawCategories instanceof java.util.List)) {
                         sendCloudJs("window.onCloudDownloadError('مؤشر النسخة السحابية غير صالح')");
                         return;
                     }
                     java.util.List<?> categories = (java.util.List<?>) rawCategories;
-                    if (categories.isEmpty() || categories.size() > 30) {
-                        sendCloudJs("window.onCloudDownloadError('قائمة أقسام النسخة غير صالحة')");
+                    java.util.HashSet<String> uniqueCategories = new java.util.HashSet<>();
+                    if (categories.size() != 12) {
+                        sendCloudJs("window.onCloudDownloadError('قائمة أقسام النسخة غير مكتملة')");
                         return;
+                    }
+                    for (Object rawCategory : categories) {
+                        if (!(rawCategory instanceof String) || !isAllowedCloudCategory((String) rawCategory) || !uniqueCategories.add((String) rawCategory)) {
+                            sendCloudJs("window.onCloudDownloadError('أقسام النسخة غير صالحة أو مكررة')");
+                            return;
+                        }
                     }
                     AtomicInteger completed = new AtomicInteger(0);
                     AtomicBoolean failed = new AtomicBoolean(false);
                     for (Object rawCategory : categories) {
-                        if (!(rawCategory instanceof String) || !isAllowedCloudCategory((String) rawCategory)) {
-                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError('اسم قسم غير صالح')");
-                            continue;
-                        }
                         String category = (String) rawCategory;
                         db.collection("shops").document(uid).collection("snapshots").document(snapshotId)
                             .collection("meta").document(category).get()
@@ -262,12 +265,36 @@ public class MainActivity extends FragmentActivity {
                                 db.collection("shops").document(uid).collection("snapshots").document(snapshotId)
                                     .collection("data").document(category).collection("chunks").get()
                                     .addOnSuccessListener(chunks -> {
+                                        if (chunks.size() != count) {
+                                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("عدد أجزاء النسخة غير متطابق: "+category)+")");
+                                            return;
+                                        }
+                                        java.util.HashMap<Integer,String> verified = new java.util.HashMap<>();
                                         for (QueryDocumentSnapshot chunk : chunks) {
                                             String data = chunk.getString("data");
-                                            Long index = chunk.getLong("index");
-                                            if (data != null && index != null && index >= 0 && index < count) {
-                                                sendCloudJs("window.onCloudChunkReceived("+JSONObject.quote(category)+","+index+","+count+","+JSONObject.quote(data)+")");
+                                            Long indexValue = chunk.getLong("index");
+                                            if (data == null || data.length() > 100000 || indexValue == null || indexValue < 0 || indexValue >= count) {
+                                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("جزء غير صالح داخل "+category)+")");
+                                                return;
                                             }
+                                            int index = indexValue.intValue();
+                                            String expectedId = String.format(Locale.US,"%06d",index);
+                                            if (!expectedId.equals(chunk.getId()) || verified.put(index,data) != null) {
+                                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("جزء مكرر أو بمعرّف غير صحيح داخل "+category)+")");
+                                                return;
+                                            }
+                                        }
+                                        if (verified.size() != count) {
+                                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("هناك أجزاء ناقصة داخل "+category)+")");
+                                            return;
+                                        }
+                                        for (int index = 0; index < count; index++) {
+                                            String data = verified.get(index);
+                                            if (data == null) {
+                                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("جزء مفقود داخل "+category)+")");
+                                                return;
+                                            }
+                                            sendCloudJs("window.onCloudChunkReceived("+JSONObject.quote(category)+","+index+","+count+","+JSONObject.quote(data)+")");
                                         }
                                         if (completed.incrementAndGet() == categories.size() && !failed.get()) sendCloudJs("window.onCloudDownloadComplete(true)");
                                     })
