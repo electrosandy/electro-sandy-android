@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application android:icon="@drawable/ic_electro_sandy" android:roundIcon="@drawable/ic_electro_sandy" android:allowBackup="true" android:label="ELECTRO Sandy" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
         <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize|keyboardHidden">
             <intent-filter>
