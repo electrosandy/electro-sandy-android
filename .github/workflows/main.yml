@@ -44,6 +44,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # Reuse the same runner debug keystore so later APKs can update this install.
+      - name: Restore stable debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: electro-sandy-android-debug-keystore-v1
+
       - name: Build Android APK
         run: |
           cd "$PROJECT_DIR"
