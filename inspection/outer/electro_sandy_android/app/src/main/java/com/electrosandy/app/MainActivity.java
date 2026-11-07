@@ -422,6 +422,12 @@ public class MainActivity extends FragmentActivity {
         getWindow().setNavigationBarColor(android.graphics.Color.rgb(19,36,58));
         webView = new WebView(this);
         webView.getSettings().setJavaScriptEnabled(true);
+        webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(false);
+        webView.getSettings().setSupportMultipleWindows(false);
+        webView.getSettings().setMediaPlaybackRequiresUserGesture(true);
+        webView.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        if (android.os.Build.VERSION.SDK_INT >= 26) webView.getSettings().setSafeBrowsingEnabled(true);
+        webView.getSettings().setGeolocationEnabled(false);
         webView.getSettings().setDomStorageEnabled(true);
         webView.getSettings().setAllowFileAccess(true);
         webView.getSettings().setAllowContentAccess(true);
