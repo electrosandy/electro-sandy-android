@@ -167,12 +167,12 @@ public class MainActivity extends FragmentActivity {
         }
         @JavascriptInterface public void cloudWriteChunk(String snapshotId, String category, int index, String data) {
             if (!isSafeSnapshotId(snapshotId) || !isAllowedCloudCategory(category) || index < 0 || index >= 10000 || data == null || data.length() > 100000) {
-                sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category == null ? "" : category)+","+index+",false,'بيانات جزء غير صالحة')");
+                sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category == null ? "" : category)+","+index+",false,'بيانات جزء غير صالحة',"+JSONObject.quote(snapshotId)+")");
                 return;
             }
             String uid = FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid();
             if (uid == null) {
-                sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",false,'سجل الدخول أولاً')");
+                sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",false,'سجل الدخول أولاً',"+JSONObject.quote(snapshotId)+")");
                 return;
             }
             Map<String,Object> chunk = new HashMap<>();
@@ -183,17 +183,17 @@ public class MainActivity extends FragmentActivity {
                 .collection("snapshots").document(snapshotId).collection("data")
                 .document(category).collection("chunks")
                 .document(String.format(Locale.US,"%06d",index)).set(chunk)
-                .addOnSuccessListener(v -> sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",true,'')"))
-                .addOnFailureListener(e -> sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",false,"+JSONObject.quote(e.getMessage())+")"));
+                .addOnSuccessListener(v -> sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",true,'',"+JSONObject.quote(snapshotId)+")"))
+                .addOnFailureListener(e -> sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")"));
         }
         @JavascriptInterface public void cloudFinishCategory(String snapshotId, String category, int count) {
             if (!isSafeSnapshotId(snapshotId) || !isAllowedCloudCategory(category) || count < 1 || count > 10000) {
-                sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category == null ? "" : category)+",false,'بيانات القسم غير صالحة')");
+                sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category == null ? "" : category)+",false,'بيانات القسم غير صالحة',"+JSONObject.quote(snapshotId)+")");
                 return;
             }
             String uid = FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid();
             if (uid == null) {
-                sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",false,'سجل الدخول أولاً')");
+                sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",false,'سجل الدخول أولاً',"+JSONObject.quote(snapshotId)+")");
                 return;
             }
             Map<String,Object> meta = new HashMap<>();
@@ -202,17 +202,17 @@ public class MainActivity extends FragmentActivity {
             FirebaseFirestore.getInstance().collection("shops").document(uid)
                 .collection("snapshots").document(snapshotId).collection("meta")
                 .document(category).set(meta)
-                .addOnSuccessListener(v -> sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",true,'')"))
-                .addOnFailureListener(e -> sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",false,"+JSONObject.quote(e.getMessage())+")"));
+                .addOnSuccessListener(v -> sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",true,'',"+JSONObject.quote(snapshotId)+")"))
+                .addOnFailureListener(e -> sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")"));
         }
         @JavascriptInterface public void cloudCommitSnapshot(String snapshotId, String categoriesJson, String expectedBaseId, boolean requireBaseMatch) {
             if (!isSafeSnapshotId(snapshotId) || (requireBaseMatch && expectedBaseId != null && !expectedBaseId.isEmpty() && !isSafeSnapshotId(expectedBaseId))) {
-                sendCloudJs("window.onCloudSnapshotCommitted(false,'معرّف النسخة غير صالح')");
+                sendCloudJs("window.onCloudSnapshotCommitted(false,'معرّف النسخة غير صالح',"+JSONObject.quote(snapshotId)+")");
                 return;
             }
             String uid = FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid();
             if (uid == null) {
-                sendCloudJs("window.onCloudSnapshotCommitted(false,'سجل الدخول أولاً')");
+                sendCloudJs("window.onCloudSnapshotCommitted(false,'سجل الدخول أولاً',"+JSONObject.quote(snapshotId)+")");
                 return;
             }
             try {
@@ -233,20 +233,20 @@ public class MainActivity extends FragmentActivity {
                         .addOnSuccessListener(meta -> {
                             if (!meta.exists()) {
                                 if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'بيانات قسم غير مكتملة: '+"
-                                    + JSONObject.quote(category) + ")");
+                                    + JSONObject.quote(category) + ","+JSONObject.quote(snapshotId)+")");
                                 return;
                             }
                             Long countValue = meta.getLong("chunkCount");
                             int count = countValue == null ? 0 : countValue.intValue();
                             if (count < 1 || count > 10000) {
-                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'عدد أجزاء غير صالح')");
+                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'عدد أجزاء غير صالح',"+JSONObject.quote(snapshotId)+")");
                                 return;
                             }
                             FirebaseFirestore.getInstance().collection("shops").document(uid)
                                 .collection("snapshots").document(snapshotId).collection("data").document(category).collection("chunks").get()
                                 .addOnSuccessListener(chunks -> {
                                     if (chunks.size() != count) {
-                                        if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'أجزاء النسخة غير مكتملة')");
+                                        if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'أجزاء النسخة غير مكتملة',"+JSONObject.quote(snapshotId)+")");
                                         return;
                                     }
                                     java.util.HashSet<Integer> indexes = new java.util.HashSet<>();
@@ -256,12 +256,12 @@ public class MainActivity extends FragmentActivity {
                                         if (indexValue == null || indexValue < 0 || indexValue >= count || data == null || data.length() > 100000
                                             || !String.format(Locale.US,"%06d",indexValue.intValue()).equals(chunk.getId())
                                             || !indexes.add(indexValue.intValue())) {
-                                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'جزء غير صالح داخل النسخة')");
+                                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'جزء غير صالح داخل النسخة',"+JSONObject.quote(snapshotId)+")");
                                             return;
                                         }
                                     }
                                     if (indexes.size() != count) {
-                                        if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'هناك أجزاء ناقصة داخل النسخة')");
+                                        if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'هناك أجزاء ناقصة داخل النسخة',"+JSONObject.quote(snapshotId)+")");
                                         return;
                                     }
                                     if (verifiedCount.incrementAndGet() == categories.size() && !failed.get()) {
@@ -292,28 +292,28 @@ public class MainActivity extends FragmentActivity {
                                                         transaction.set(pointerRef, pointer);
                                                         return true;
                                                     }).addOnSuccessListener(committed -> {
-                                                        if (Boolean.TRUE.equals(committed)) sendCloudJs("window.onCloudSnapshotCommitted(true,'')");
-                                                        else sendCloudJs("window.onCloudSnapshotCommitted(false,'CLOUD_CONFLICT: النسخة السحابية تغيرت من جهاز آخر')");
-                                                    }).addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")"));
+                                                        if (Boolean.TRUE.equals(committed)) sendCloudJs("window.onCloudSnapshotCommitted(true,'',"+JSONObject.quote(snapshotId)+")");
+                                                        else sendCloudJs("window.onCloudSnapshotCommitted(false,'CLOUD_CONFLICT: النسخة السحابية تغيرت من جهاز آخر',"+JSONObject.quote(snapshotId)+")");
+                                                    }).addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")"));
                                                 } else {
                                                     pointerRef.set(pointer)
-                                                        .addOnSuccessListener(v -> sendCloudJs("window.onCloudSnapshotCommitted(true,'')"))
-                                                        .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")"));
+                                                        .addOnSuccessListener(v -> sendCloudJs("window.onCloudSnapshotCommitted(true,'',"+JSONObject.quote(snapshotId)+")"))
+                                                        .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")"));
                                                 }
                                             })
-                                            .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")"));
+                                            .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")"));
                                     }
                                 })
                                 .addOnFailureListener(e -> {
-                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")");
+                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")");
                                 });
                         })
                         .addOnFailureListener(e -> {
-                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")");
+                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")");
                         });
                 }
             } catch (Exception e) {
-                sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")");
+                sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")");
             }
         }
         @JavascriptInterface public void cloudDownloadSnapshot(String requestId) {
