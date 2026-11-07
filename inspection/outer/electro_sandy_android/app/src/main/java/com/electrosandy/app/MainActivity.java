@@ -12,6 +12,8 @@ import android.net.Uri;
 import android.print.PrintManager;
 import android.print.PrintAttributes;
 import android.content.Context;
+import android.speech.RecognizerIntent;
+import java.util.ArrayList;
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 import org.json.JSONObject;
@@ -22,6 +24,16 @@ public class MainActivity extends Activity {
     private static class WebAppInterface {
         private final Activity activity;
         WebAppInterface(Activity activity) { this.activity = activity; }
+        @JavascriptInterface public void startVoiceSearch() {
+            activity.runOnUiThread(() -> {
+                Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar-MA");
+                intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "قل اسم المنتج أو الباركود");
+                try { activity.startActivityForResult(intent, VOICE_SEARCH); }
+                catch (Exception e) { if (activity instanceof MainActivity) ((MainActivity) activity).notifyVoiceUnavailable(); }
+            });
+        }
         @JavascriptInterface public void scanBarcode() {
             activity.runOnUiThread(() -> {
                 IntentIntegrator scanner = new IntentIntegrator(activity);
@@ -59,6 +71,7 @@ public class MainActivity extends Activity {
     }
     private ValueCallback<Uri[]> fileCallback;
     private static final int FILE_CHOOSER = 1001;
+    private static final int VOICE_SEARCH = 1002;
 
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -72,6 +85,7 @@ public class MainActivity extends Activity {
         WebAppInterface bridge = new WebAppInterface(this);
         webView.addJavascriptInterface(bridge, "AndroidShare");
         webView.addJavascriptInterface(bridge, "AndroidScanner");
+        webView.addJavascriptInterface(bridge, "AndroidVoice");
         webView.setWebViewClient(new WebViewClient());
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
@@ -87,8 +101,19 @@ public class MainActivity extends Activity {
         webView.loadUrl("file:///android_asset/www/index.html");
     }
 
+    private void notifyVoiceUnavailable() {
+        if (webView != null) webView.evaluateJavascript("window.toast && window.toast('خدمة البحث الصوتي غير متاحة على هذا الجهاز')", null);
+    }
+
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == VOICE_SEARCH) {
+            if (resultCode == RESULT_OK && data != null && webView != null) {
+                ArrayList<String> matches = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                if (matches != null && !matches.isEmpty()) webView.evaluateJavascript("window.onVoiceSearchResult(" + JSONObject.quote(matches.get(0)) + ")", null);
+            }
+            return;
+        }
         IntentResult scanResult = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
         if (scanResult != null) {
             if (scanResult.getContents() != null && webView != null) {
