@@ -596,7 +596,7 @@ function importBackup(file){if(!requireRole('admin'))return;
     keys.forEach((k,i)=>{try{if(previous[i]===null)localStorage.removeItem(k);else localStorage.setItem(k,previous[i])}catch(rollbackError){}});
     throw new Error('تعذر الاسترجاع بسبب مساحة التخزين؛ تمت محاولة إعادة البيانات السابقة');
    }
-   products=d.products;orders=d.orders;customers=d.customers;purchases=d.purchases;cashEntries=d.cashEntries;cashClosings=Array.isArray(d.cashClosings)?d.cashClosings:[];stockAudits=Array.isArray(d.stockAudits)?d.stockAudits:[];activityLog=Array.isArray(d.activityLog)?d.activityLog:[];warranties=Array.isArray(d.warranties)?d.warranties:[];appUsers=Array.isArray(d.users)?d.users:appUsers;suppliers=Array.isArray(d.suppliers)?d.suppliers:[];returns=Array.isArray(d.returns)?d.returns:[];sellerProfile=d.sellerProfile;currentUser=appUsers.find(u=>u.id===currentUser?.id)||null;if(!currentUser)renderLogin();cart={};
+   products=d.products;orders=d.orders;customers=d.customers;purchases=d.purchases;cashEntries=d.cashEntries;cashClosings=Array.isArray(d.cashClosings)?d.cashClosings:[];stockAudits=Array.isArray(d.stockAudits)?d.stockAudits:[];activityLog=Array.isArray(d.activityLog)?d.activityLog:[];warranties=Array.isArray(d.warranties)?d.warranties:[];appUsers=Array.isArray(d.users)?d.users:appUsers;suppliers=Array.isArray(d.suppliers)?d.suppliers:[];returns=Array.isArray(d.returns)?d.returns:[];sellerProfile=d.sellerProfile;currentUser=appUsers.find(u=>u.id===currentUser?.id&&u.active!==false)||null;if(!currentUser)renderLogin();cart={};
    renderSaleProducts();renderCart();renderProducts();renderHomeProducts();renderStock();renderTransfer();renderStockAudit();renderCustomerSelect();renderCustomers();renderReports();renderWarranties();renderUserAdmin();renderSuppliers();renderReturns();renderPurchases();renderCash();refresh();
    toast('تم استرجاع النسخة الاحتياطية بنجاح');
   }catch(e){toast(e&&e.message?e.message:'ملف النسخة غير صالح')}
@@ -621,7 +621,7 @@ function restoreAutoBackup(){
   return toast('تعذر الاسترجاع بسبب مساحة التخزين؛ تم إلغاء العملية');
  }
  [products,orders,customers,purchases,cashEntries,cashClosings,stockAudits,activityLog,warranties,appUsers,suppliers,returns,sellerProfile]=values;
- currentUser=appUsers.find(u=>u.id===currentUser?.id)||null;
+ currentUser=appUsers.find(u=>u.id===currentUser?.id&&u.active!==false)||null;
  cart={};
  if(!currentUser){renderLogin();return toast('تم استرجاع البيانات. سجل الدخول بحساب موجود في النسخة')}
  renderSaleProducts();renderCart();renderProducts();renderHomeProducts();renderStock();renderTransfer();renderCustomerSelect();renderCustomers();renderReports();renderWarranties();renderUserAdmin();renderSuppliers();renderReturns();renderPurchases();renderCash();refresh();
