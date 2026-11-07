@@ -513,7 +513,18 @@ public class MainActivity extends FragmentActivity {
         super.onDestroy();
     }
 
+    private void fallbackBackNavigation() {
+        if (webView != null && webView.canGoBack()) webView.goBack();
+        else super.onBackPressed();
+    }
+
     @Override public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) webView.goBack(); else super.onBackPressed();
+        if (webView == null) {
+            super.onBackPressed();
+            return;
+        }
+        webView.evaluateJavascript("(function(){return window.handleAndroidBack ? window.handleAndroidBack() : false;})()", value -> {
+            if (!"true".equals(value)) fallbackBackNavigation();
+        });
     }
 }
