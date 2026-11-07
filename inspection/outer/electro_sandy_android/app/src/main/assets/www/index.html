@@ -359,7 +359,7 @@ function recordReturn(){
  qty=Number(document.getElementById('returnQty').value),
  reason=String(document.getElementById('returnReason').value||'').trim();
  if(!order||!item||!Number.isInteger(qty)||qty<1)return toast('راجع الفاتورة والكمية');
- let itemQty=Number(item.qty),alreadyReturned=Number(item.returnedQty||0);
+ let itemQty=Number(item.qty),alreadyReturned=Number(item.returnedQty??0);
  if(!Number.isInteger(itemQty)||itemQty<1||!Number.isInteger(alreadyReturned)||alreadyReturned<0||alreadyReturned>itemQty)return toast('بيانات الكمية في الفاتورة غير سليمة');
  let left=itemQty-alreadyReturned;
  if(qty>left)return toast('الكمية أكبر من المتبقي القابل للإرجاع');
@@ -378,7 +378,7 @@ function recordReturn(){
  let pct=Number(order.discountPercent||0),subtotal=Number(order.subtotal??order.total??0),loyaltyDiscount=Number(order.loyaltyDiscountAmount||0);
  if(!Number.isFinite(pct)||pct<0||pct>100||!Number.isFinite(subtotal)||subtotal<0||!Number.isFinite(loyaltyDiscount)||loyaltyDiscount<0)return toast('بيانات التخفيض في الفاتورة غير سليمة');
  let baseSubtotal=subtotal*(1-pct/100),baseReturned=unitPrice*(1-pct/100)*qty;
- if(!Number.isFinite(baseSubtotal)||!Number.isFinite(baseReturned)||baseReturned<0||baseReturned>baseSubtotal+0.000001)return toast('قيمة الإرجاع غير متوافقة مع الفاتورة');
+ if(!Number.isFinite(baseSubtotal)||!Number.isFinite(baseReturned)||baseReturned<0||baseReturned>baseSubtotal+0.000001||loyaltyDiscount>baseSubtotal+0.000001)return toast('قيمة الإرجاع أو التخفيض غير متوافقة مع الفاتورة');
  let pointsShare=baseSubtotal>0?loyaltyDiscount*(baseReturned/baseSubtotal):0,
  refund=Math.max(0,baseReturned-pointsShare),
  unitCost=item.unitCost,
