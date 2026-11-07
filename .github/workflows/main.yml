@@ -1,3 +1,4 @@
+
 name: Build Android APK
 
 on:
@@ -11,27 +12,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract ZIP
+      - name: Extract Updated ZIP
         run: |
           mkdir project
-          unzip -o electro_sandy_android.zip -d project
+          unzip -o electro_sandy_android_fixed.zip -d project
+          echo "Project files:"
           find project -name settings.gradle -o -name settings.gradle.kts
+          echo "Checking Android assets:"
+          find project -path "*/assets/www/index.html"
 
       - name: Set up JDK
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Build APK
+      - name: Build Android APK
         run: |
           GRADLE_FILE=$(find project -name settings.gradle -o -name settings.gradle.kts | head -n 1)
+
           if [ -z "$GRADLE_FILE" ]; then
-            echo "Gradle project not found"
+            echo "ERROR: Gradle project not found"
             exit 1
           fi
+
           PROJECT_DIR=$(dirname "$GRADLE_FILE")
           cd "$PROJECT_DIR"
+
           gradle assembleDebug
 
       - name: Upload APK
@@ -39,3 +46,4 @@ jobs:
         with:
           name: ELECTRO-Sandy-APK
           path: project/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
