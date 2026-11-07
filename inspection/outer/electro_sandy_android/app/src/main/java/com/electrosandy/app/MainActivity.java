@@ -103,6 +103,15 @@ public class MainActivity extends FragmentActivity {
                 printView.loadDataWithBaseURL(null, html == null ? "" : html, "text/html", "UTF-8", null);
             });
         }
+        private boolean isAllowedCloudCategory(String category) {
+            return category != null && java.util.Arrays.asList(
+                "products","orders","customers","purchases","cashEntries","cashClosings",
+                "stockAudits","sellerProfile","activityLog","warranties","suppliers","returns"
+            ).contains(category);
+        }
+        private boolean isSafeSnapshotId(String snapshotId) {
+            return snapshotId != null && snapshotId.matches("[a-z0-9-]{1,64}");
+        }
         private void sendCloudJs(String script) {
             if (activity instanceof MainActivity) {
                 MainActivity main = (MainActivity) activity;
@@ -134,6 +143,10 @@ public class MainActivity extends FragmentActivity {
             sendCloudJs("window.onCloudSignedOut && window.onCloudSignedOut()");
         }
         @JavascriptInterface public void cloudWriteChunk(String snapshotId, String category, int index, String data) {
+            if (!isSafeSnapshotId(snapshotId) || !isAllowedCloudCategory(category) || index < 0 || index >= 10000 || data == null || data.length() > 100000) {
+                sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category == null ? "" : category)+","+index+",false,'بيانات جزء غير صالحة')");
+                return;
+            }
             String uid = FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid();
             if (uid == null) {
                 sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",false,'سجل الدخول أولاً')");
@@ -151,6 +164,10 @@ public class MainActivity extends FragmentActivity {
                 .addOnFailureListener(e -> sendCloudJs("window.onCloudChunkSaved("+JSONObject.quote(category)+","+index+",false,"+JSONObject.quote(e.getMessage())+")"));
         }
         @JavascriptInterface public void cloudFinishCategory(String snapshotId, String category, int count) {
+            if (!isSafeSnapshotId(snapshotId) || !isAllowedCloudCategory(category) || count < 1 || count > 10000) {
+                sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category == null ? "" : category)+",false,'بيانات القسم غير صالحة')");
+                return;
+            }
             String uid = FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid();
             if (uid == null) {
                 sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",false,'سجل الدخول أولاً')");
@@ -166,6 +183,10 @@ public class MainActivity extends FragmentActivity {
                 .addOnFailureListener(e -> sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",false,"+JSONObject.quote(e.getMessage())+")"));
         }
         @JavascriptInterface public void cloudCommitSnapshot(String snapshotId, String categoriesJson) {
+            if (!isSafeSnapshotId(snapshotId)) {
+                sendCloudJs("window.onCloudSnapshotCommitted(false,'معرّف النسخة غير صالح')");
+                return;
+            }
             String uid = FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid();
             if (uid == null) {
                 sendCloudJs("window.onCloudSnapshotCommitted(false,'سجل الدخول أولاً')");
@@ -174,8 +195,13 @@ public class MainActivity extends FragmentActivity {
             try {
                 org.json.JSONArray parsed = new org.json.JSONArray(categoriesJson == null ? "[]" : categoriesJson);
                 java.util.ArrayList<String> categories = new java.util.ArrayList<>();
-                for (int i = 0; i < parsed.length(); i++) categories.add(parsed.getString(i));
-                if (categories.isEmpty()) throw new IllegalArgumentException("لا توجد أقسام للنسخة");
+                for (int i = 0; i < parsed.length(); i++) {
+                    String category = parsed.getString(i);
+                    if (!isAllowedCloudCategory(category) || categories.contains(category))
+                        throw new IllegalArgumentException("اسم قسم غير صالح أو مكرر");
+                    categories.add(category);
+                }
+                if (categories.size() != 12) throw new IllegalArgumentException("قائمة أقسام النسخة غير مكتملة");
                 Map<String,Object> pointer = new HashMap<>();
                 pointer.put("snapshotId", snapshotId);
                 pointer.put("categories", categories);
@@ -215,7 +241,7 @@ public class MainActivity extends FragmentActivity {
                     AtomicInteger completed = new AtomicInteger(0);
                     AtomicBoolean failed = new AtomicBoolean(false);
                     for (Object rawCategory : categories) {
-                        if (!(rawCategory instanceof String)) {
+                        if (!(rawCategory instanceof String) || !isAllowedCloudCategory((String) rawCategory)) {
                             if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError('اسم قسم غير صالح')");
                             continue;
                         }
@@ -224,7 +250,7 @@ public class MainActivity extends FragmentActivity {
                             .collection("meta").document(category).get()
                             .addOnSuccessListener(metaDoc -> {
                                 if (!metaDoc.exists()) {
-                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError('بيانات قسم مفقودة: '+category)");
+                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("بيانات قسم مفقودة: "+category)+")");
                                     return;
                                 }
                                 Long countValue = metaDoc.getLong("chunkCount");
