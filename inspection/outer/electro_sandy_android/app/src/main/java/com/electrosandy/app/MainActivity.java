@@ -280,11 +280,13 @@ public class MainActivity extends FragmentActivity {
                                                         com.google.firebase.firestore.DocumentSnapshot current = transaction.get(pointerRef);
                                                         String currentId = current.exists() ? current.getString("snapshotId") : "";
                                                         if (currentId == null) currentId = "";
-                                                        if (!expectedBase.equals(currentId)) throw new IllegalStateException("CLOUD_CONFLICT: النسخة السحابية تغيرت من جهاز آخر");
+                                                        if (!expectedBase.equals(currentId)) return false;
                                                         transaction.set(pointerRef, pointer);
-                                                        return null;
-                                                    }).addOnSuccessListener(v -> sendCloudJs("window.onCloudSnapshotCommitted(true,'')"))
-                                                      .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")"));
+                                                        return true;
+                                                    }).addOnSuccessListener(committed -> {
+                                                        if (Boolean.TRUE.equals(committed)) sendCloudJs("window.onCloudSnapshotCommitted(true,'')");
+                                                        else sendCloudJs("window.onCloudSnapshotCommitted(false,'CLOUD_CONFLICT: النسخة السحابية تغيرت من جهاز آخر')");
+                                                    }).addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")"));
                                                 } else {
                                                     pointerRef.set(pointer)
                                                         .addOnSuccessListener(v -> sendCloudJs("window.onCloudSnapshotCommitted(true,'')"))
