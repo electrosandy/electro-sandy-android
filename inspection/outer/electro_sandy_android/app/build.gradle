@@ -4,10 +4,11 @@ android {
     namespace 'com.electrosandy.app'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.electrosandy.app'
+        // Separate install so the existing app and its local data remain untouched.
+        applicationId 'com.electrosandy.app.fresh'
         minSdk 23
         targetSdk 35
-        versionCode 22
-        versionName '22.0'
+        versionCode 23
+        versionName '23.0'
     }
 }
