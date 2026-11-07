@@ -465,8 +465,8 @@ function importBackup(file){if(!requireRole('admin'))return;
    try{
     keys.forEach((k,i)=>localStorage.setItem(k,JSON.stringify(values[i])));
    }catch(writeError){
-    keys.forEach((k,i)=>{if(previous[i]===null)localStorage.removeItem(k);else localStorage.setItem(k,previous[i])});
-    throw writeError;
+    keys.forEach((k,i)=>{try{if(previous[i]===null)localStorage.removeItem(k);else localStorage.setItem(k,previous[i])}catch(rollbackError){}});
+    throw new Error('تعذر الاسترجاع بسبب مساحة التخزين؛ تمت محاولة إعادة البيانات السابقة');
    }
    products=d.products;orders=d.orders;customers=d.customers;purchases=d.purchases;cashEntries=d.cashEntries;cashClosings=Array.isArray(d.cashClosings)?d.cashClosings:[];stockAudits=Array.isArray(d.stockAudits)?d.stockAudits:[];activityLog=Array.isArray(d.activityLog)?d.activityLog:[];warranties=Array.isArray(d.warranties)?d.warranties:[];appUsers=Array.isArray(d.users)?d.users:appUsers;localStorage.setItem('es13_users',JSON.stringify(appUsers));suppliers=Array.isArray(d.suppliers)?d.suppliers:[];localStorage.setItem('es13_suppliers',JSON.stringify(suppliers));returns=Array.isArray(d.returns)?d.returns:[];localStorage.setItem('es13_returns',JSON.stringify(returns));sellerProfile=d.sellerProfile;currentUser=appUsers.find(u=>u.id===currentUser?.id)||null;if(!currentUser)renderLogin();cart={};
    renderSaleProducts();renderCart();renderProducts();renderHomeProducts();renderStock();renderTransfer();renderCustomerSelect();renderCustomers();renderReports();renderWarranties();renderSuppliers();renderReturns();refresh();
