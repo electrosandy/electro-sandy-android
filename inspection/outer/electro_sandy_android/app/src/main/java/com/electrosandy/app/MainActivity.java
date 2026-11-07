@@ -242,13 +242,26 @@ public class MainActivity extends FragmentActivity {
                                         return;
                                     }
                                     if (verifiedCount.incrementAndGet() == categories.size() && !failed.get()) {
-                                        Map<String,Object> pointer = new HashMap<>();
-                                        pointer.put("snapshotId", snapshotId);
-                                        pointer.put("categories", categories);
-                                        pointer.put("updatedAt", System.currentTimeMillis());
+                                        long committedAt = System.currentTimeMillis();
+                                        Map<String,Object> snapshotInfo = new HashMap<>();
+                                        snapshotInfo.put("snapshotId", snapshotId);
+                                        snapshotInfo.put("categories", categories);
+                                        snapshotInfo.put("categoryCount", categories.size());
+                                        snapshotInfo.put("createdAt", committedAt);
+                                        snapshotInfo.put("schemaVersion", 1);
+                                        snapshotInfo.put("status", "READY");
                                         FirebaseFirestore.getInstance().collection("shops").document(uid)
-                                            .collection("snapshotMeta").document("current").set(pointer)
-                                            .addOnSuccessListener(v -> sendCloudJs("window.onCloudSnapshotCommitted(true,'')"))
+                                            .collection("snapshots").document(snapshotId).set(snapshotInfo)
+                                            .addOnSuccessListener(snapshotSaved -> {
+                                                Map<String,Object> pointer = new HashMap<>();
+                                                pointer.put("snapshotId", snapshotId);
+                                                pointer.put("categories", categories);
+                                                pointer.put("updatedAt", committedAt);
+                                                FirebaseFirestore.getInstance().collection("shops").document(uid)
+                                                    .collection("snapshotMeta").document("current").set(pointer)
+                                                    .addOnSuccessListener(v -> sendCloudJs("window.onCloudSnapshotCommitted(true,'')"))
+                                                    .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")"));
+                                            })
                                             .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")"));
                                     }
                                 })
