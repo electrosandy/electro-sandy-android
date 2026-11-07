@@ -703,14 +703,14 @@ let days=[];for(let n=6;n>=0;n--){let d=new Date(start);d.setDate(start.getDate(
 let alerts=[];low.slice(0,5).forEach(p=>alerts.push({icon:'📦',label:'مخزون منخفض: '+p.name,meta:(Number(p.central||0)+Number(p.van1||0)+Number(p.van2||0))+' متوفر',go:'stock'}));let debts=orders.filter(o=>Number(o.balance??(String(o.payment||'').includes('دين')?o.total:0))>0);if(debts.length)alerts.push({icon:'💳',label:'فواتير فيها مبالغ متبقية',meta:debts.length+' فاتورة',go:'reports'});let expiring=warranties.filter(w=>w.status!=='returned'&&new Date(w.expiresAt).getTime()>=Date.now()&&new Date(w.expiresAt).getTime()<=Date.now()+30*86400000);if(expiring.length)alerts.push({icon:'🛡️',label:'ضمانات قريبة من الانتهاء',meta:expiring.length+' ضمان خلال 30 يوم',go:'warranties'});let lastBackup=Number(localStorage.getItem('es13_last_auto_backup')||0);if(!lastBackup||Date.now()-lastBackup>7*86400000)alerts.push({icon:'💾',label:'تذكير بالنسخ الاحتياطي الخارجي',meta:'صدّر نسخة JSON واحتفظ بها خارج الجهاز',go:'settings'});if(!alerts.length)alerts.push({icon:'✓',label:'كل شيء على ما يرام',meta:'لا توجد تنبيهات',go:''});put('premiumAlertCount',alerts.filter(a=>a.icon!=='✓').length);let box=document.getElementById('premiumAlerts');if(box)box.innerHTML=alerts.slice(0,6).map(a=>'<div class="premium-alert" '+(a.go?'onclick="go(\''+a.go+'\')" style="cursor:pointer"':'')+'><span class="premium-alert-icon">'+a.icon+'</span><b>'+statementEscape(a.label)+'</b><span>'+statementEscape(a.meta)+'</span></div>').join('')}
 function renderReps(){
  let el=document.getElementById('repList');if(!el)return;
- let reps=appUsers.filter(u=>u.role==='seller'||orders.some(o=>Number(o.sellerUserId)===Number(u.id)));
+ let reps=appUsers.filter(u=>u.role==='seller');
  let rows=reps.map(u=>{
   let sales=orders.filter(o=>Number(o.sellerUserId)===Number(u.id)),
       revenue=sales.reduce((a,o)=>{let n=Number(o.total||0)-Number(o.returnedAmount||0);return a+(Number.isFinite(n)?Math.max(0,n):0)},0),
       debt=sales.reduce((a,o)=>{let n=Number(o.balance||0);return a+(Number.isFinite(n)?Math.max(0,n):0)},0);
   return '<div class="listrow"><div class="avatar">👤</div><div class="grow"><b>'+statementEscape(u.name)+'</b><small>'+(u.active===false?'حساب موقوف':'حساب نشط')+' • '+sales.length+' فاتورة</small><small>المبيعات الصافية: '+revenue.toFixed(2)+' DH • ديون الزبناء: '+debt.toFixed(2)+' DH</small></div></div>'
  }).join('');
- let unassigned=orders.filter(o=>o.sellerUserId===undefined||o.sellerUserId===null||o.sellerUserId==='').length;
+ let unassigned=orders.filter(o=>!appUsers.some(u=>u.role==='seller'&&Number(u.id)===Number(o.sellerUserId))).length;
  el.innerHTML=rows||'<div class="empty">لا توجد حسابات مندوبين. أضف مستخدماً بدور بائع من إدارة المستخدمين.</div>';
  if(unassigned)el.innerHTML+='<div class="notice" style="margin-top:10px">'+unassigned+' فاتورة قديمة أو غير منسوبة إلى مندوب.</div>'
 }
