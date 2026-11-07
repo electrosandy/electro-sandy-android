@@ -68,7 +68,7 @@ jobs:
           const path = require('path');
           const htmlPath = path.join(process.env.PROJECT_DIR, 'app/src/main/assets/www/index.html');
           const html = fs.readFileSync(htmlPath, 'utf8');
-          const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)];
+          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
           if (!scripts.length) throw new Error('No embedded JavaScript found');
           scripts.forEach((match, index) => {
             new Function(match[1]);
