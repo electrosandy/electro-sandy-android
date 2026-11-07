@@ -316,34 +316,35 @@ public class MainActivity extends FragmentActivity {
                 sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")");
             }
         }
-        @JavascriptInterface public void cloudDownloadSnapshot() {
+        @JavascriptInterface public void cloudDownloadSnapshot(String requestId) {
+            if (!isSafeSnapshotId(requestId)) return;
             String uid = FirebaseAuth.getInstance().getCurrentUser() == null ? null : FirebaseAuth.getInstance().getCurrentUser().getUid();
             if (uid == null) {
-                sendCloudJs("window.onCloudDownloadError('سجل الدخول أولاً')");
+                sendCloudJs("window.onCloudDownloadError('سجل الدخول أولاً',"+JSONObject.quote(requestId)+")");
                 return;
             }
             FirebaseFirestore db = FirebaseFirestore.getInstance();
             db.collection("shops").document(uid).collection("snapshotMeta").document("current").get()
                 .addOnSuccessListener(pointerDoc -> {
                     if (!pointerDoc.exists()) {
-                        sendCloudJs("window.onCloudDownloadComplete(false)");
+                        sendCloudJs("window.onCloudDownloadComplete(false,'',"+JSONObject.quote(requestId)+")");
                         return;
                     }
                     String snapshotId = pointerDoc.getString("snapshotId");
                     Object rawCategories = pointerDoc.get("categories");
                     if (!isSafeSnapshotId(snapshotId) || !(rawCategories instanceof java.util.List)) {
-                        sendCloudJs("window.onCloudDownloadError('مؤشر النسخة السحابية غير صالح')");
+                        sendCloudJs("window.onCloudDownloadError('مؤشر النسخة السحابية غير صالح',"+JSONObject.quote(requestId)+")");
                         return;
                     }
                     java.util.List<?> categories = (java.util.List<?>) rawCategories;
                     java.util.HashSet<String> uniqueCategories = new java.util.HashSet<>();
                     if (categories.size() != 12) {
-                        sendCloudJs("window.onCloudDownloadError('قائمة أقسام النسخة غير مكتملة')");
+                        sendCloudJs("window.onCloudDownloadError('قائمة أقسام النسخة غير مكتملة',"+JSONObject.quote(requestId)+")");
                         return;
                     }
                     for (Object rawCategory : categories) {
                         if (!(rawCategory instanceof String) || !isAllowedCloudCategory((String) rawCategory) || !uniqueCategories.add((String) rawCategory)) {
-                            sendCloudJs("window.onCloudDownloadError('أقسام النسخة غير صالحة أو مكررة')");
+                            sendCloudJs("window.onCloudDownloadError('أقسام النسخة غير صالحة أو مكررة',"+JSONObject.quote(requestId)+")");
                             return;
                         }
                     }
@@ -355,20 +356,20 @@ public class MainActivity extends FragmentActivity {
                             .collection("meta").document(category).get()
                             .addOnSuccessListener(metaDoc -> {
                                 if (!metaDoc.exists()) {
-                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("بيانات قسم مفقودة: "+category)+")");
+                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("بيانات قسم مفقودة: "+category)+","+JSONObject.quote(requestId)+")");
                                     return;
                                 }
                                 Long countValue = metaDoc.getLong("chunkCount");
                                 int count = countValue == null ? 0 : countValue.intValue();
                                 if (count < 1 || count > 10000) {
-                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("عدد أجزاء غير صالح: "+category)+")");
+                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("عدد أجزاء غير صالح: "+category)+","+JSONObject.quote(requestId)+")");
                                     return;
                                 }
                                 db.collection("shops").document(uid).collection("snapshots").document(snapshotId)
                                     .collection("data").document(category).collection("chunks").get()
                                     .addOnSuccessListener(chunks -> {
                                         if (chunks.size() != count) {
-                                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("عدد أجزاء النسخة غير متطابق: "+category)+")");
+                                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("عدد أجزاء النسخة غير متطابق: "+category)+","+JSONObject.quote(requestId)+")");
                                             return;
                                         }
                                         java.util.HashMap<Integer,String> verified = new java.util.HashMap<>();
@@ -376,40 +377,40 @@ public class MainActivity extends FragmentActivity {
                                             String data = chunk.getString("data");
                                             Long indexValue = chunk.getLong("index");
                                             if (data == null || data.length() > 100000 || indexValue == null || indexValue < 0 || indexValue >= count) {
-                                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("جزء غير صالح داخل "+category)+")");
+                                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("جزء غير صالح داخل "+category)+","+JSONObject.quote(requestId)+")");
                                                 return;
                                             }
                                             int index = indexValue.intValue();
                                             String expectedId = String.format(Locale.US,"%06d",index);
                                             if (!expectedId.equals(chunk.getId()) || verified.put(index,data) != null) {
-                                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("جزء مكرر أو بمعرّف غير صحيح داخل "+category)+")");
+                                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("جزء مكرر أو بمعرّف غير صحيح داخل "+category)+","+JSONObject.quote(requestId)+")");
                                                 return;
                                             }
                                         }
                                         if (verified.size() != count) {
-                                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("هناك أجزاء ناقصة داخل "+category)+")");
+                                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("هناك أجزاء ناقصة داخل "+category)+","+JSONObject.quote(requestId)+")");
                                             return;
                                         }
                                         for (int index = 0; index < count; index++) {
                                             String data = verified.get(index);
                                             if (data == null) {
-                                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("جزء مفقود داخل "+category)+")");
+                                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("جزء مفقود داخل "+category)+","+JSONObject.quote(requestId)+")");
                                                 return;
                                             }
-                                            sendCloudJs("window.onCloudChunkReceived("+JSONObject.quote(category)+","+index+","+count+","+JSONObject.quote(data)+")");
+                                            sendCloudJs("window.onCloudChunkReceived("+JSONObject.quote(category)+","+index+","+count+","+JSONObject.quote(data)+","+JSONObject.quote(requestId)+")");
                                         }
-                                        if (completed.incrementAndGet() == categories.size() && !failed.get()) sendCloudJs("window.onCloudDownloadComplete(true,"+JSONObject.quote(snapshotId)+")");
+                                        if (completed.incrementAndGet() == categories.size() && !failed.get()) sendCloudJs("window.onCloudDownloadComplete(true,"+JSONObject.quote(snapshotId)+","+JSONObject.quote(requestId)+")");
                                     })
                                     .addOnFailureListener(e -> {
-                                        if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+")");
+                                        if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+","+JSONObject.quote(requestId)+")");
                                     });
                             })
                             .addOnFailureListener(e -> {
-                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+")");
+                                if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+","+JSONObject.quote(requestId)+")");
                             });
                     }
                 })
-                .addOnFailureListener(e -> sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+")"));
+                .addOnFailureListener(e -> sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+","+JSONObject.quote(requestId)+")"));
         }
     }
     private ValueCallback<Uri[]> fileCallback;
