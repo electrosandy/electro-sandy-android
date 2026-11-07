@@ -32,11 +32,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainActivity extends FragmentActivity {
     private WebView webView;
+    private WebAppInterface bridge;
 
     private static class WebAppInterface {
         private final Activity activity;
         private ListenerRegistration cloudSnapshotListener;
         WebAppInterface(Activity activity) { this.activity = activity; }
+        void cleanup() {
+            if (cloudSnapshotListener != null) {
+                cloudSnapshotListener.remove();
+                cloudSnapshotListener = null;
+            }
+        }
         private void watchCloudSnapshot(String uid) {
             if (cloudSnapshotListener != null) cloudSnapshotListener.remove();
             cloudSnapshotListener = FirebaseFirestore.getInstance().collection("shops").document(uid)
@@ -417,12 +424,25 @@ public class MainActivity extends FragmentActivity {
         webView.getSettings().setDomStorageEnabled(true);
         webView.getSettings().setAllowFileAccess(true);
         webView.getSettings().setAllowContentAccess(true);
-        WebAppInterface bridge = new WebAppInterface(this);
+        webView.getSettings().setAllowFileAccessFromFileURLs(false);
+        webView.getSettings().setAllowUniversalAccessFromFileURLs(false);
+        bridge = new WebAppInterface(this);
         webView.addJavascriptInterface(bridge, "AndroidShare");
         webView.addJavascriptInterface(bridge, "AndroidScanner");
         webView.addJavascriptInterface(bridge, "AndroidVoice");
         webView.addJavascriptInterface(bridge, "AndroidBiometric");
-        webView.setWebViewClient(new WebViewClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                if (url == null) return true;
+                if (url.startsWith("file:///android_asset/")) return false;
+                if (url.startsWith("https://") || url.startsWith("http://")) {
+                    try {
+                        MainActivity.this.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                    } catch (Exception ignored) { }
+                }
+                return true;
+            }
+        });
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (fileCallback != null) fileCallback.onReceiveValue(null);
@@ -462,6 +482,24 @@ public class MainActivity extends FragmentActivity {
             fileCallback.onReceiveValue(result);
             fileCallback = null;
         }
+    }
+
+    @Override protected void onDestroy() {
+        if (bridge != null) bridge.cleanup();
+        if (webView != null) {
+            webView.stopLoading();
+            webView.removeJavascriptInterface("AndroidShare");
+            webView.removeJavascriptInterface("AndroidScanner");
+            webView.removeJavascriptInterface("AndroidVoice");
+            webView.removeJavascriptInterface("AndroidBiometric");
+            webView.destroy();
+            webView = null;
+        }
+        if (fileCallback != null) {
+            fileCallback.onReceiveValue(null);
+            fileCallback = null;
+        }
+        super.onDestroy();
     }
 
     @Override public void onBackPressed() {
