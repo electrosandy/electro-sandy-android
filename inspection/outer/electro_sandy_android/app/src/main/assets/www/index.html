@@ -367,7 +367,7 @@ function recordReturn(){
  let unitPrice=Number(item.unitPrice);
  if(!Number.isFinite(unitPrice)||unitPrice<0)return toast('ثمن المنتج في الفاتورة غير صالح');
  let source=['central','van1','van2'].includes(order.source)?order.source:'central',
- serials=String(document.getElementById('returnSerials').value||'').split(/[\\n,;]+/).map(x=>x.trim()).filter(Boolean),
+ serials=String(document.getElementById('returnSerials').value||'').split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean),
  p=products.find(x=>x.id===item.productId);
  if(!p)return toast('المنتج غير موجود في المخزون');
  let currentStock=Number(p[source]??0);
