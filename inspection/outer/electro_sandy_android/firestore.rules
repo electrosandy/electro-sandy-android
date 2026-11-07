@@ -36,7 +36,10 @@ service cloud.firestore {
         && request.resource.data.snapshotId == snapshotId
         && request.resource.data.categoryCount == 12
         && request.resource.data.schemaVersion == 1
-        && request.resource.data.status == 'READY';
+        && request.resource.data.status == 'READY'
+        && request.resource.data.createdAt is int
+        && request.resource.data.categories is list
+        && request.resource.data.categories.size() == 12;
       allow delete: if false;
 
       match /meta/{category} {
@@ -60,7 +63,6 @@ service cloud.firestore {
           && request.resource.data.index is int
           && request.resource.data.index >= 0
           && request.resource.data.index < 10000
-          && request.resource.data.index == int(chunkId)
           && request.resource.data.data is string
           && request.resource.data.data.size() <= 100000
           && request.resource.data.updatedAt is int;
