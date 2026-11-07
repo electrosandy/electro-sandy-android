@@ -182,8 +182,8 @@ public class MainActivity extends FragmentActivity {
                 .addOnSuccessListener(v -> sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",true,'')"))
                 .addOnFailureListener(e -> sendCloudJs("window.onCloudCategorySaved("+JSONObject.quote(category)+",false,"+JSONObject.quote(e.getMessage())+")"));
         }
-        @JavascriptInterface public void cloudCommitSnapshot(String snapshotId, String categoriesJson) {
-            if (!isSafeSnapshotId(snapshotId)) {
+        @JavascriptInterface public void cloudCommitSnapshot(String snapshotId, String categoriesJson, String expectedBaseId, boolean requireBaseMatch) {
+            if (!isSafeSnapshotId(snapshotId) || (requireBaseMatch && expectedBaseId != null && !expectedBaseId.isEmpty() && !isSafeSnapshotId(expectedBaseId))) {
                 sendCloudJs("window.onCloudSnapshotCommitted(false,'معرّف النسخة غير صالح')");
                 return;
             }
@@ -257,10 +257,24 @@ public class MainActivity extends FragmentActivity {
                                                 pointer.put("snapshotId", snapshotId);
                                                 pointer.put("categories", categories);
                                                 pointer.put("updatedAt", committedAt);
-                                                FirebaseFirestore.getInstance().collection("shops").document(uid)
-                                                    .collection("snapshotMeta").document("current").set(pointer)
-                                                    .addOnSuccessListener(v -> sendCloudJs("window.onCloudSnapshotCommitted(true,'')"))
-                                                    .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")"));
+                                                com.google.firebase.firestore.DocumentReference pointerRef = FirebaseFirestore.getInstance().collection("shops").document(uid)
+                                                    .collection("snapshotMeta").document("current");
+                                                if (requireBaseMatch) {
+                                                    String expectedBase = expectedBaseId == null ? "" : expectedBaseId;
+                                                    FirebaseFirestore.getInstance().runTransaction(transaction -> {
+                                                        com.google.firebase.firestore.DocumentSnapshot current = transaction.get(pointerRef);
+                                                        String currentId = current.exists() ? current.getString("snapshotId") : "";
+                                                        if (currentId == null) currentId = "";
+                                                        if (!expectedBase.equals(currentId)) throw new IllegalStateException("CLOUD_CONFLICT: النسخة السحابية تغيرت من جهاز آخر");
+                                                        transaction.set(pointerRef, pointer);
+                                                        return null;
+                                                    }).addOnSuccessListener(v -> sendCloudJs("window.onCloudSnapshotCommitted(true,'')"))
+                                                      .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")"));
+                                                } else {
+                                                    pointerRef.set(pointer)
+                                                        .addOnSuccessListener(v -> sendCloudJs("window.onCloudSnapshotCommitted(true,'')"))
+                                                        .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")"));
+                                                }
                                             })
                                             .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+")"));
                                     }
@@ -359,7 +373,7 @@ public class MainActivity extends FragmentActivity {
                                             }
                                             sendCloudJs("window.onCloudChunkReceived("+JSONObject.quote(category)+","+index+","+count+","+JSONObject.quote(data)+")");
                                         }
-                                        if (completed.incrementAndGet() == categories.size() && !failed.get()) sendCloudJs("window.onCloudDownloadComplete(true)");
+                                        if (completed.incrementAndGet() == categories.size() && !failed.get()) sendCloudJs("window.onCloudDownloadComplete(true,"+JSONObject.quote(snapshotId)+")");
                                     })
                                     .addOnFailureListener(e -> {
                                         if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+")");
