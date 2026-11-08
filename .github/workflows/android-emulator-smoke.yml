@@ -82,18 +82,27 @@ jobs:
           trap capture_failure ERR
           test -s "$APK"
           adb wait-for-device
-          booted=0
-          for attempt in $(seq 1 90); do
-            if timeout 10s adb shell getprop sys.boot_completed 2>/dev/null | grep -q '^1'; then booted=1; break; fi
-            sleep 2
+          # sys.boot_completed can become 1 before Android system services are ready.
+          # Wait for both Package Manager and Activity Manager before attempting install.
+          ready=0
+          for attempt in $(seq 1 120); do
+            booted=$(timeout 10s adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
+            package_service=$(timeout 10s adb shell service check package 2>/dev/null || true)
+            activity_service=$(timeout 10s adb shell service check activity 2>/dev/null || true)
+            if [ "$booted" = "1" ] && echo "$package_service" | grep -q "Found" && echo "$activity_service" | grep -q "Found"; then
+              ready=1
+              break
+            fi
+            sleep 3
           done
-          if [ "$booted" -ne 1 ]; then
-            echo "Android emulator did not finish booting within 3 minutes"
+          if [ "$ready" -ne 1 ]; then
+            echo "Android emulator system services did not become ready within 6 minutes"
+            timeout 20s adb shell service list > "$GITHUB_WORKSPACE/emulator-results/services-not-ready.txt" 2>&1 || true
             exit 1
           fi
           # Log clearing is best-effort on some emulator images; it must not block app validation.
           timeout 15s adb logcat -c >/dev/null 2>&1 || true
-          timeout 90s adb install -r "$APK" | tee "$GITHUB_WORKSPACE/emulator-results/install.txt"
+          timeout 180s adb install -r "$APK" | tee "$GITHUB_WORKSPACE/emulator-results/install.txt"
           timeout 20s adb shell pm path "$PACKAGE" | tee "$GITHUB_WORKSPACE/emulator-results/package-path.txt"
           grep -q "package:" "$GITHUB_WORKSPACE/emulator-results/package-path.txt"
           timeout 20s adb shell cmd package resolve-activity --brief "$PACKAGE" | tee "$GITHUB_WORKSPACE/emulator-results/resolved-activity.txt"
