@@ -2,6 +2,9 @@ name: Android Emulator Smoke Test
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - inspect-project-zip
 
 permissions:
   contents: read
@@ -29,6 +32,12 @@ jobs:
             echo "ERROR: Android project directory not found"
             exit 1
           fi
+
+      - name: Run cash accounting regression tests
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          node --test tests/cash-accounting.test.cjs
 
       - name: Build debug APK
         shell: bash
