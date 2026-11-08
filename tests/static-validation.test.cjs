@@ -88,3 +88,12 @@ test('product image picker previews selected photos and accepts Android provider
   assert.match(html, /تعذرت قراءة ملف الصورة/);
   assert.match(html, /صيغة الصورة غير مدعومة على هذا الجهاز/);
 });
+
+test('product image picker reports empty selections and verifies saved images', () => {
+  assert.match(html, /\[ELECTRO_IMAGES\] picker files=/);
+  assert.match(html, /لم يتم استلام أي صورة من منتقي الملفات/);
+  assert.match(html, /saved new product images=/);
+  assert.match(html, /saved edit images=/);
+  assert.match(html, /productImageList\(persisted\)\.length!==allImages\.length/);
+  assert.match(html, /renderHomeProducts\(\);logActivity\('إضافة منتج'/);
+});
