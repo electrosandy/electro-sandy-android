@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           cd "$PROJECT_DIR"
-          node --test tests/cash-accounting.test.cjs tests/financial-regression.test.cjs
+          node --test tests/cash-accounting.test.cjs tests/financial-regression.test.cjs tests/cloud-sync.test.cjs
 
       - name: Static JavaScript and DOM integrity tests
         shell: bash
