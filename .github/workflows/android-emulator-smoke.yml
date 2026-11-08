@@ -2,9 +2,6 @@ name: Android Emulator Smoke Test
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - inspect-project-zip
 
 permissions:
   contents: read
