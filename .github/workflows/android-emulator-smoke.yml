@@ -2,6 +2,9 @@ name: Android Emulator Smoke Test
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - inspect-project-zip
 
 permissions:
   contents: read
@@ -88,15 +91,18 @@ jobs:
             exit 1
           fi
           adb logcat -c
-          timeout 90s adb install -r "$APK"
+          timeout 90s adb install -r "$APK" | tee "$GITHUB_WORKSPACE/emulator-results/install.txt"
+          timeout 20s adb shell pm path "$PACKAGE" | tee "$GITHUB_WORKSPACE/emulator-results/package-path.txt"
+          grep -q "package:" "$GITHUB_WORKSPACE/emulator-results/package-path.txt"
+          timeout 20s adb shell cmd package resolve-activity --brief "$PACKAGE" | tee "$GITHUB_WORKSPACE/emulator-results/resolved-activity.txt"
           timeout 20s adb shell am force-stop "$PACKAGE"
-          timeout 30s adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1
+          timeout 45s adb shell am start -W -n "$PACKAGE/com.electrosandy.app.MainActivity" | tee "$GITHUB_WORKSPACE/emulator-results/launch.txt"
           sleep 20
           timeout 20s adb shell pidof "$PACKAGE" > "$GITHUB_WORKSPACE/emulator-results/app-pid.txt"
           test -s "$GITHUB_WORKSPACE/emulator-results/app-pid.txt"
           timeout 20s adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/emulator-results/activities.txt"
           timeout 20s adb exec-out screencap -p > "$GITHUB_WORKSPACE/emulator-results/launch-screen.png"
-          adb logcat -d -v time > "$GITHUB_WORKSPACE/emulator-results/logcat.txt"
+          adb logcat -b all -d -v time > "$GITHUB_WORKSPACE/emulator-results/logcat.txt"
           if grep -E "FATAL EXCEPTION|Process: ${PACKAGE}" "$GITHUB_WORKSPACE/emulator-results/logcat.txt"; then
             echo "Fatal Android crash detected"
             exit 1
