@@ -528,7 +528,7 @@ function periodReportHarness() {
     oneLineFunction('orderInitialPaidMethodBalances'),
     oneLineFunction('periodSaleReceipts'),
     blockFunction('renderPeriodReport', 'printPeriodReport')
-  ].join('\\n'), context);
+  ].join('\n'), context);
   return { fields, order, returnRows, entries, messages, context };
 }
 
