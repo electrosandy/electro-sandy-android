@@ -487,3 +487,109 @@ test('failed local save rolls business arrays back to the last persisted snapsho
   assert.equal(context.cloudAutoSyncEnabled, false);
 });
 
+
+
+function periodReportHarness() {
+  const fields = {
+    reportFrom: { value: '2026-11-08' },
+    reportTo: { value: '2026-11-08' },
+    periodReportResult: { innerHTML: '', textContent: '' },
+    periodReportRows: { innerHTML: '' }
+  };
+  const order = {
+    id: 11, invoiceNo: 'ES-11', date: '2026-11-08', customer: 'Test customer',
+    total: 100, paidAmount: 70, paidCashAmount: 43.75, paidBankAmount: 26.25,
+    balance: 30, payment: 'مختلط / Mixte', createdAt: '2026-11-08T12:00:00',
+    costMethod: 'weighted_average_verified', costTotal: 60, returnedAmount: 10
+  };
+  const returnRows = [{
+    id: 1, orderId: 11, refund: 10, costReturned: 6,
+    createdAt: '2026-11-08T13:00:00'
+  }];
+  const entries = [
+    { id: 1, relatedOrderId: 11, amount: 10, type: 'in', method: 'cash', entryKind: 'debt_payment', createdAt: '2026-11-08T12:30:00' },
+    { id: 2, relatedOrderId: 11, amount: 6.25, type: 'out', method: 'cash', entryKind: 'sale_refund', createdAt: '2026-11-08T13:00:00' },
+    { id: 3, relatedOrderId: 11, amount: 3.75, type: 'out', method: 'bank', entryKind: 'sale_refund', createdAt: '2026-11-08T13:00:00' },
+    { id: 4, amount: 4, type: 'out', method: 'cash', note: 'مصاريف نقل', createdAt: '2026-11-08T14:00:00' },
+    { id: 5, amount: 5, type: 'in', method: 'bank', note: 'إيداع بنكي', createdAt: '2026-11-08T14:00:00' },
+    { id: 6, amount: 3, type: 'out', method: 'bank', note: 'رسوم بنكية', createdAt: '2026-11-08T14:00:00' }
+  ];
+  const messages = [];
+  const context = vm.createContext({
+    Math, Number, String, Array, Date,
+    document: { getElementById: id => fields[id] || null },
+    orders: [order], returns: returnRows, cashEntries: entries,
+    periodDate: x => { const d = new Date(x.createdAt || x.id || x.date || 0); return Number.isNaN(d.getTime()) ? null : d; },
+    statementEscape: x => String(x ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+    toast: message => messages.push(message)
+  });
+  vm.runInContext([
+    oneLineFunction('orderPaidMethodBalances'),
+    oneLineFunction('orderInitialPaidMethodBalances'),
+    oneLineFunction('periodSaleReceipts'),
+    blockFunction('renderPeriodReport', 'printPeriodReport')
+  ].join('\\n'), context);
+  return { fields, order, returnRows, entries, messages, context };
+}
+
+test('period report separates net sales, returns, known cost, cash and bank flows', () => {
+  const { fields, context } = periodReportHarness();
+  context.renderPeriodReport();
+  const html = fields.periodReportResult.innerHTML;
+  assert.match(html, /المبيعات الصافية<strong>90\\.00 DH/);
+  assert.match(html, /المرتجعات خلال الفترة<strong>10\\.00 DH/);
+  assert.match(html, /تكلفة البضاعة الصافية المعروفة<strong>54\\.00 DH/);
+  assert.match(html, /الربح الإجمالي المعروف<strong>36\\.00 DH/);
+  assert.match(html, /المصاريف المسجلة<strong>7\\.00 DH/);
+  assert.match(html, /مصاريف الصندوق<strong>4\\.00 DH/);
+  assert.match(html, /مصاريف البنك<strong>3\\.00 DH/);
+  assert.match(html, /مداخيل الصندوق<strong>50\\.00 DH/);
+  assert.match(html, /مداخيل البنك<strong>35\\.00 DH/);
+  assert.match(html, /ديون الفواتير<strong>30\\.00 DH/);
+  assert.equal(fields.periodReportRows.innerHTML.includes('ES-11'), true);
+});
+
+test('period CSV export filters by selected dates and safely quotes customer data', () => {
+  const fields = {
+    reportFrom: { value: '2026-11-08' },
+    reportTo: { value: '2026-11-08' }
+  };
+  const saved = [];
+  const context = vm.createContext({
+    Math, Number, String, Array, Date,
+    document: { getElementById: id => fields[id] || null },
+    orders: [
+      { id: 11, invoiceNo: 'ES-11', date: '2026-11-08', customerInfo: { name: 'Ali "A"' }, total: 100, paidAmount: 70, balance: 30, createdAt: '2026-11-08T12:00:00' },
+      { id: 12, invoiceNo: 'ES-12', date: '2026-11-09', customer: 'Outside period', total: 50, paidAmount: 50, balance: 0, createdAt: '2026-11-09T12:00:00' }
+    ],
+    periodDate: x => { const d = new Date(x.createdAt || x.id || x.date || 0); return Number.isNaN(d.getTime()) ? null : d; },
+    saveTextFile: (...args) => saved.push(args),
+    toast: () => {}
+  });
+  vm.runInContext(blockFunction('exportPeriodReport', 'financialSummary'), context);
+  context.exportPeriodReport();
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0][0], 'ELECTRO-Sandy-periode-2026-11-08-2026-11-08.csv');
+  assert.match(saved[0][1], /"Ali ""A"""/);
+  assert.match(saved[0][1], /ES-11/);
+  assert.doesNotMatch(saved[0][1], /ES-12|Outside period/);
+});
+
+test('period CSV export rejects a reversed date range without creating a file', () => {
+  const fields = {
+    reportFrom: { value: '2026-11-09' },
+    reportTo: { value: '2026-11-08' }
+  };
+  const saved = [], messages = [];
+  const context = vm.createContext({
+    Math, Number, String, Array, Date,
+    document: { getElementById: id => fields[id] || null },
+    orders: [], periodDate: () => null,
+    saveTextFile: (...args) => saved.push(args),
+    toast: message => messages.push(message)
+  });
+  vm.runInContext(blockFunction('exportPeriodReport', 'financialSummary'), context);
+  context.exportPeriodReport();
+  assert.equal(saved.length, 0);
+  assert.deepEqual(messages, ['تاريخ البداية خاصو يكون قبل تاريخ النهاية']);
+});
