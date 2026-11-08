@@ -64,8 +64,6 @@ jobs:
             APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
             PACKAGE="com.electrosandy.app.fresh"
             mkdir -p "$GITHUB_WORKSPACE/emulator-results"
-
-            mkdir -p "$GITHUB_WORKSPACE/emulator-results"
             adb wait-for-device
             booted=0
             for attempt in $(seq 1 90); do
