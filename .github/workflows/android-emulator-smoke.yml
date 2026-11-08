@@ -7,6 +7,10 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+concurrency:
+  group: android-emulator-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -82,25 +86,21 @@ jobs:
           trap capture_failure ERR
           test -s "$APK"
           adb wait-for-device
-          # sys.boot_completed can become 1 before Android system services are ready.
-          # Wait for both Package Manager and Activity Manager before attempting install.
+          # Check boot and both required system services in one adb shell round-trip.
           ready=0
-          for attempt in $(seq 1 120); do
-            booted=$(timeout 10s adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
-            package_service=$(timeout 10s adb shell service check package 2>/dev/null || true)
-            activity_service=$(timeout 10s adb shell service check activity 2>/dev/null || true)
-            if [ "$booted" = "1" ] && echo "$package_service" | grep -q "Found" && echo "$activity_service" | grep -q "Found"; then
+          for attempt in $(seq 1 90); do
+            system_state=$(timeout 12s adb shell 'echo BOOT=$(getprop sys.boot_completed); service check package; service check activity' 2>/dev/null | tr -d '\r' || true)
+            if echo "$system_state" | grep -q 'BOOT=1' && [ "$(echo "$system_state" | grep -c 'Found')" -ge 2 ]; then
               ready=1
               break
             fi
-            sleep 3
+            sleep 2
           done
           if [ "$ready" -ne 1 ]; then
-            echo "Android emulator system services did not become ready within 6 minutes"
+            echo "Android emulator system services did not become ready within 3 minutes"
             timeout 20s adb shell service list > "$GITHUB_WORKSPACE/emulator-results/services-not-ready.txt" 2>&1 || true
             exit 1
           fi
-          # Log clearing is best-effort on some emulator images; it must not block app validation.
           timeout 15s adb logcat -c >/dev/null 2>&1 || true
           timeout 180s adb install -r "$APK" | tee "$GITHUB_WORKSPACE/emulator-results/install.txt"
           timeout 20s adb shell pm path "$PACKAGE" | tee "$GITHUB_WORKSPACE/emulator-results/package-path.txt"
@@ -108,7 +108,6 @@ jobs:
           timeout 20s adb shell cmd package resolve-activity --brief "$PACKAGE" | tee "$GITHUB_WORKSPACE/emulator-results/resolved-activity.txt"
           timeout 20s adb shell am force-stop "$PACKAGE"
           timeout 45s adb shell am start -W -n "$PACKAGE/com.electrosandy.app.MainActivity" | tee "$GITHUB_WORKSPACE/emulator-results/launch.txt" || true
-          # A cold WebView can exceed am start -W; wait for the HTML page to finish rendering.
           page_ready=0
           for attempt in $(seq 1 90); do
             if timeout 10s adb logcat -d -s ELECTRO_SMOKE:I 2>/dev/null | grep -q 'DOM_STATE'; then
@@ -119,7 +118,6 @@ jobs:
           done
           if [ "$page_ready" -ne 1 ]; then
             echo "WebView did not finish rendering the app within 180 seconds"
-            # Preserve diagnostics on explicit test failures too (ERR traps do not run for exit 1).
             timeout 20s adb logcat -b all -d -v time > "$GITHUB_WORKSPACE/emulator-results/logcat-page-timeout.txt" 2>&1 || true
             timeout 20s adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/emulator-results/activities-page-timeout.txt" 2>&1 || true
             timeout 20s adb shell dumpsys webviewupdate > "$GITHUB_WORKSPACE/emulator-results/webview-provider.txt" 2>&1 || true
