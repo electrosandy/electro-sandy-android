@@ -292,3 +292,45 @@ test('supplier payment allocates oldest payable first and records one bank outfl
   assert.equal(cashEntries[0].method, 'bank');
   assert.equal(cashEntries[0].allocations.length, 2);
 });
+
+
+test('daily cash closing records the computed expected balance and blocks a duplicate close', () => {
+  const fields = { actualCash: { value: '60' }, cashCloseResult: { textContent: '' } };
+  const cashClosings = [], messages = [];
+  const context = vm.createContext({
+    Math, Number, String, Array, Date,
+    document: { getElementById: id => fields[id] || null },
+    cashClosings, requireRole: () => true,
+    localDayKey: value => {
+      const d = value instanceof Date ? value : new Date(value);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    },
+    calculateCashExpectedForDay: () => 55,
+    orders: [], cashEntries: [], save: () => true,
+    logActivity: () => {}, toast: message => messages.push(message)
+  });
+  vm.runInContext(oneLineFunction('closeDailyCash'), context);
+  context.closeDailyCash();
+  assert.equal(cashClosings.length, 1);
+  assert.equal(cashClosings[0].expected, 55);
+  assert.equal(cashClosings[0].actual, 60);
+  assert.equal(cashClosings[0].difference, 5);
+  assert.match(fields.cashCloseResult.textContent, /55\.00 DH/);
+  context.closeDailyCash();
+  assert.equal(cashClosings.length, 1);
+  assert.ok(messages.some(message => String(message).includes('من قبل')));
+});
+
+test('backup user validation requires a unique active administrator and a supported PIN hash', () => {
+  const validAdmin = {
+    id: 1, name: 'Admin', role: 'admin', active: true,
+    pinHash: 'pbkdf2$120000$' + 'a'.repeat(32) + '$' + 'b'.repeat(64)
+  };
+  const context = vm.createContext({ Math, Number, String, Array, Set });
+  vm.runInContext(oneLineFunction('validUserBackup'), context);
+  assert.equal(context.validUserBackup([validAdmin]), true);
+  assert.equal(context.validUserBackup([{ ...validAdmin, role: 'seller' }]), false);
+  assert.equal(context.validUserBackup([{ ...validAdmin, pinHash: 'bad-hash' }]), false);
+  assert.equal(context.validUserBackup([validAdmin, { ...validAdmin, id: 2, name: 'Other' }]), true);
+  assert.equal(context.validUserBackup([validAdmin, { ...validAdmin, name: 'Admin' }]), false);
+});
