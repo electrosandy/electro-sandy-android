@@ -89,8 +89,8 @@ test('bank-only refund does not alter expected cash', () => {
   assert.equal(dayCash([o],[refund]), 0);
 });
 
-test('entries from another day do not affect the daily cash close', () => {
-  const o = orderBase();
+test('prior debt collections are excluded from the sale base and from today cash flow', () => {
+  const o = orderBase({paidAmount:120, balance:30, paidCashAmount:90, paidBankAmount:30});
   const prior = entry({amount:50, createdAt:'2026-11-07T11:00:00.000Z'});
   assert.equal(dayCash([o],[prior]), 40);
 });
