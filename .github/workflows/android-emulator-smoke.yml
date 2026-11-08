@@ -53,7 +53,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ELECTRO-Sandy-Emulator-APK
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          path: inspection/outer/electro_sandy_android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
       - name: Prepare emulator smoke script
