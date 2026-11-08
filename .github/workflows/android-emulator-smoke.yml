@@ -49,6 +49,13 @@ jobs:
           gradle assembleDebug
           test -s app/build/outputs/apk/debug/app-debug.apk
 
+      - name: Upload debug APK for emulator validation
+        uses: actions/upload-artifact@v4
+        with:
+          name: ELECTRO-Sandy-Emulator-APK
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
       - name: Boot emulator, install app and run launch checks
         timeout-minutes: 12
         uses: reactivecircus/android-emulator-runner@v2
