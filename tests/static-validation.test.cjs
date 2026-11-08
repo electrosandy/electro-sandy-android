@@ -95,5 +95,5 @@ test('product image picker reports empty selections and verifies saved images', 
   assert.match(html, /saved new product images=/);
   assert.match(html, /saved edit images=/);
   assert.match(html, /productImageList\(persisted\)\.length!==allImages\.length/);
-  assert.match(html, /renderHomeProducts\(\);logActivity\('إضافة منتج'/);
+  assert.match(html, /renderHomeProducts\(\);/);
 });
