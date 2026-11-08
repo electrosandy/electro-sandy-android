@@ -90,7 +90,7 @@ jobs:
           ready=0
           for attempt in $(seq 1 90); do
             system_state=$(timeout 12s adb shell 'echo BOOT=$(getprop sys.boot_completed); service check package; service check activity' 2>/dev/null | tr -d '\r' || true)
-            if echo "$system_state" | grep -q 'BOOT=1' && [ "$(echo "$system_state" | grep -c 'Found')" -ge 2 ]; then
+            if echo "$system_state" | grep -q 'BOOT=1' && [ "$(echo "$system_state" | grep -ic 'found')" -ge 2 ]; then
               ready=1
               break
             fi
