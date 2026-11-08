@@ -445,3 +445,44 @@ test('pre-restore safety backup fails closed when storage cannot save the snapsh
   vm.runInContext(oneLineFunction('savePreRestoreSafetyBackup'), context);
   assert.equal(context.savePreRestoreSafetyBackup(), false);
 });
+
+
+test('failed local save rolls business arrays back to the last persisted snapshot', () => {
+  const storage = new Map([
+    ['es13_products', JSON.stringify([{ id: 1, name: 'Saved product' }])],
+    ['es13_orders', JSON.stringify([{ id: 2 }])],
+    ['es13_customers', JSON.stringify([{ id: 3 }])],
+    ['es13_purchases', JSON.stringify([{ id: 4 }])],
+    ['es13_cash', JSON.stringify([{ id: 5 }])],
+    ['es13_seller_profile', JSON.stringify({ company: 'Saved shop' })]
+  ]);
+  const context = vm.createContext({
+    Math, Number, String, Array, Date, JSON,
+    localStorage: {
+      getItem: key => storage.has(key) ? storage.get(key) : null,
+      setItem: (key, value) => {
+        if (key === 'es13_orders') throw new Error('quota');
+        storage.set(key, String(value));
+      },
+      removeItem: key => storage.delete(key)
+    },
+    products: [{ id: 99 }], orders: [{ id: 98 }], customers: [{ id: 97 }],
+    purchases: [{ id: 96 }], cashEntries: [{ id: 95 }],
+    sellerProfile: { company: 'Unsaved shop' },
+    warranties: [], returns: [], suppliers: [], stockAudits: [], cashClosings: [],
+    cloudSyncConflict: false, cloudAutoSyncEnabled: true,
+    cloudRefreshAutoSyncUi: () => {}, cloudSetStatus: () => {},
+    toast: () => {}, refresh: () => {}
+  });
+  vm.runInContext(oneLineFunction('save'), context);
+  assert.equal(context.save(), false);
+  assert.equal(context.products[0].id, 1);
+  assert.equal(context.products[0].name, 'Saved product');
+  assert.equal(context.orders[0].id, 2);
+  assert.equal(context.customers[0].id, 3);
+  assert.equal(context.purchases[0].id, 4);
+  assert.equal(context.cashEntries[0].id, 5);
+  assert.equal(context.sellerProfile.company, 'Saved shop');
+  assert.equal(context.cloudSyncConflict, true);
+  assert.equal(context.cloudAutoSyncEnabled, false);
+});
