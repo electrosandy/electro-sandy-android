@@ -2,9 +2,6 @@ name: Build Android APK # Keep product modal save action visible
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - inspect-project-zip
 
 jobs:
   build:
