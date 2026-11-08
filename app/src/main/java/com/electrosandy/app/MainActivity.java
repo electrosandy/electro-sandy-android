@@ -490,9 +490,16 @@ public class MainActivity extends FragmentActivity {
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (fileCallback != null) fileCallback.onReceiveValue(null);
                 fileCallback = callback;
-                Intent intent = params.createIntent();
-                try { startActivityForResult(intent, FILE_CHOOSER); }
-                catch (Exception e) { fileCallback = null; return false; }
+                try {
+                    Intent intent = params.createIntent();
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivityForResult(intent, FILE_CHOOSER);
+                } catch (Exception e) {
+                    Log.e("ELECTRO_FILES", "Unable to open image picker", e);
+                    if (fileCallback != null) fileCallback.onReceiveValue(null);
+                    fileCallback = null;
+                    return false;
+                }
                 return true;
             }
         });
@@ -579,9 +586,25 @@ public class MainActivity extends FragmentActivity {
             return;
         }
         if (requestCode == FILE_CHOOSER && fileCallback != null) {
-            Uri[] result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
-            fileCallback.onReceiveValue(result);
+            Uri[] result = null;
+            if (resultCode == RESULT_OK && data != null) {
+                try { result = WebChromeClient.FileChooserParams.parseResult(resultCode, data); }
+                catch (Exception e) { Log.w("ELECTRO_FILES", "Unable to parse selected image URIs", e); }
+                if ((result == null || result.length == 0) && data.getClipData() != null) {
+                    android.content.ClipData clip = data.getClipData();
+                    ArrayList<Uri> selected = new ArrayList<>();
+                    for (int i = 0; i < clip.getItemCount(); i++) {
+                        Uri uri = clip.getItemAt(i).getUri();
+                        if (uri != null) selected.add(uri);
+                    }
+                    if (!selected.isEmpty()) result = selected.toArray(new Uri[0]);
+                }
+                if ((result == null || result.length == 0) && data.getData() != null) result = new Uri[]{data.getData()};
+            }
+            Log.i("ELECTRO_FILES", "Image picker resultCode=" + resultCode + " selected=" + (result == null ? 0 : result.length));
+            ValueCallback<Uri[]> callback = fileCallback;
             fileCallback = null;
+            callback.onReceiveValue(result);
         }
     }
 
