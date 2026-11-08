@@ -648,3 +648,204 @@ test('manual cash entry requires administrator permission', () => {
   assert.equal(cashEntries.length, 0);
   assert.equal(messages.length, 0);
 });
+
+
+// Backup import and cloud restore integration harnesses.
+function backupImportHarness({ backup, failKey = null } = {}) {
+  const storage = new Map();
+  const old = {
+    products: [{ id: 1, name: 'Local product' }], orders: [{ id: 10 }],
+    customers: [], purchases: [], cashEntries: [], cashClosings: [],
+    stockAudits: [], activityLog: [], warranties: [], suppliers: [], returns: [],
+    sellerProfile: { company: 'Local shop' }
+  };
+  const keyMap = {
+    products: 'es13_products', orders: 'es13_orders', customers: 'es13_customers',
+    purchases: 'es13_purchases', cashEntries: 'es13_cash', cashClosings: 'es13_cash_closings',
+    stockAudits: 'es13_stock_audits', activityLog: 'es13_activity_log',
+    warranties: 'es13_warranties', suppliers: 'es13_suppliers', returns: 'es13_returns',
+    sellerProfile: 'es13_seller_profile'
+  };
+  for (const [name, key] of Object.entries(keyMap)) storage.set(key, JSON.stringify(old[name]));
+  const localStorage = {
+    getItem: key => storage.has(key) ? storage.get(key) : null,
+    setItem: (key, value) => {
+      if (key === failKey) throw new Error('quota');
+      storage.set(key, String(value));
+    },
+    removeItem: key => storage.delete(key)
+  };
+  const fields = { backupFile: { value: 'backup.json' } };
+  const messages = [];
+  class FakeFileReader {
+    readAsText(file) { this.result = file.content; this.onload(); }
+  }
+  const context = vm.createContext({
+    Math, Number, String, Array, Set, Date, JSON, FileReader: FakeFileReader,
+    localStorage, document: { getElementById: id => fields[id] || null },
+    products: old.products, orders: old.orders, customers: old.customers,
+    purchases: old.purchases, cashEntries: old.cashEntries, cashClosings: old.cashClosings,
+    stockAudits: old.stockAudits, activityLog: old.activityLog, warranties: old.warranties,
+    appUsers: [{ id: 1, name: 'Admin', role: 'admin', active: true, pinHash: 'fallback-a' }],
+    suppliers: old.suppliers, returns: old.returns, sellerProfile: old.sellerProfile,
+    currentUser: { id: 1, role: 'admin' }, cart: {},
+    requireRole: () => true, confirm: () => true, toast: message => messages.push(message),
+    renderLogin: () => {}, renderSaleProducts: () => {}, renderCart: () => {},
+    renderProducts: () => {}, renderHomeProducts: () => {}, renderStock: () => {},
+    renderTransfer: () => {}, renderStockAudit: () => {}, renderCustomerSelect: () => {},
+    renderCustomers: () => {}, renderReports: () => {}, renderWarranties: () => {},
+    renderUserAdmin: () => {}, renderSuppliers: () => {}, renderReturns: () => {},
+    renderPurchases: () => {}, renderCash: () => {}, refresh: () => {}
+  });
+  vm.runInContext(oneLineFunction('savePreRestoreSafetyBackup'), context);
+  vm.runInContext(oneLineFunction('validUserBackup'), context);
+  vm.runInContext(blockFunction('importBackup', 'restoreAutoBackup'), context);
+  const content = JSON.stringify(backup);
+  context.importBackup({ size: Buffer.byteLength(content), content });
+  return { context, storage, messages, fields, old };
+}
+
+function validBackupFixture() {
+  return {
+    app: 'ELECTRO Sandy', schemaVersion: 1,
+    data: {
+      products: [{ id: 2, name: 'Restored product' }], orders: [{ id: 20 }],
+      customers: [{ id: 30 }], purchases: [{ id: 40 }], cashEntries: [{ id: 50 }],
+      cashClosings: [{ date: '2026-11-08' }], stockAudits: [{ id: 60 }],
+      activityLog: [{ id: 70 }], warranties: [{ id: 80 }],
+      users: [{ id: 1, name: 'Admin', role: 'admin', active: true, pinHash: 'fallback-a' }],
+      suppliers: [{ id: 90 }], returns: [{ id: 100 }],
+      sellerProfile: { company: 'Restored shop' }
+    }
+  };
+}
+
+test('backup import restores all business categories and preserves a pre-restore safety copy', () => {
+  const { context, storage, messages } = backupImportHarness({ backup: validBackupFixture() });
+  assert.equal(context.products[0].id, 2);
+  assert.equal(context.orders[0].id, 20);
+  assert.equal(context.purchases[0].id, 40);
+  assert.equal(context.cashEntries[0].id, 50);
+  assert.equal(context.cashClosings[0].date, '2026-11-08');
+  assert.equal(context.suppliers[0].id, 90);
+  assert.equal(context.returns[0].id, 100);
+  const safety = JSON.parse(storage.get('es13_auto_backups'));
+  assert.equal(safety[0].data.products[0].id, 1);
+  assert.ok(messages.includes('تم استرجاع النسخة الاحتياطية بنجاح'));
+});
+
+test('backup import rolls back already-written categories when a storage write fails', () => {
+  const { context, storage, messages } = backupImportHarness({
+    backup: validBackupFixture(), failKey: 'es13_orders'
+  });
+  assert.equal(context.products[0].id, 1);
+  assert.equal(JSON.parse(storage.get('es13_products'))[0].id, 1);
+  assert.ok(messages.some(message => message.includes('تعذر الاسترجاع بسبب مساحة التخزين')));
+});
+
+test('backup import rejects an incomplete backup without replacing local data', () => {
+  const invalid = { data: { products: [], orders: [], customers: [], purchases: [], cashEntries: [] } };
+  const { context, storage, messages } = backupImportHarness({ backup: invalid });
+  assert.equal(context.products[0].id, 1);
+  assert.equal(JSON.parse(storage.get('es13_products'))[0].id, 1);
+  assert.equal(storage.has('es13_auto_backups'), false);
+  assert.ok(messages.some(message => message.includes('معلومات البائع غير موجودة')));
+});
+
+function extractTestFunction(name) {
+  const start = html.indexOf('function ' + name + '(');
+  assert.ok(start >= 0, 'Missing application function: ' + name);
+  const open = html.indexOf('{', start);
+  let depth = 0, quote = '', escaped = false;
+  for (let i = open; i < html.length; i++) {
+    const ch = html[i];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (ch === String.fromCharCode(92)) escaped = true;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+    if (ch === '{') depth++;
+    else if (ch === '}' && --depth === 0) return html.slice(start, i + 1);
+  }
+  throw new Error('Could not extract application function: ' + name);
+}
+
+function cloudRestoreHarness({ dirtyDuringDownload = false, missingCategory = null } = {}) {
+  const categories = ['products','orders','customers','purchases','cashEntries','cashClosings',
+    'stockAudits','sellerProfile','activityLog','warranties','suppliers','returns'];
+  const remote = {
+    products: [{ id: 2, name: 'Cloud product' }], orders: [{ id: 20 }],
+    customers: [], purchases: [{ id: 40 }], cashEntries: [{ id: 50 }],
+    cashClosings: [], stockAudits: [], sellerProfile: { company: 'Cloud shop' },
+    activityLog: [], warranties: [], suppliers: [], returns: []
+  };
+  const storage = new Map();
+  const localStorage = {
+    getItem: key => storage.has(key) ? storage.get(key) : null,
+    setItem: (key, value) => storage.set(key, String(value)),
+    removeItem: key => storage.delete(key)
+  };
+  const parts = {}, expected = {};
+  for (const category of categories) {
+    if (category === missingCategory) continue;
+    parts[category] = [JSON.stringify(remote[category])];
+    expected[category] = 1;
+  }
+  const messages = [], statuses = [];
+  const context = vm.createContext({
+    Math, Number, String, Array, Set, Date, JSON, Object,
+    CLOUD_CATEGORIES: categories,
+    currentUser: { id: 1, role: 'admin' }, cloudDownloadAutomatic: false,
+    cloudAuthenticated: true, cloudAuthUid: 'account-1', cloudDownloadUid: 'account-1',
+    cloudDownloadLocalUserId: 1, cloudLocalRevision: dirtyDuringDownload ? 2 : 0,
+    cloudDownloadLocalRevision: 0, cloudDownloadRequestId: 'request-1', cloudDownloadBusy: true,
+    cloudDownloadParts: parts, cloudDownloadExpected: expected, cloudApplyingRemote: false,
+    cloudSyncConflict: false, cloudAutoSyncEnabled: true, cloudBaseSnapshotId: 'old-snapshot',
+    cloudPendingRemoteSnapshotId: '', cloudPersistSyncMeta: (key, value) => { storage.set(key, value); return true; },
+    cloudRememberOwner: () => true, savePreRestoreSafetyBackup: () => true,
+    cloudSetStatus: message => statuses.push(message), toast: message => messages.push(message),
+    localStorage, products: [{ id: 1, name: 'Local product' }], orders: [], customers: [],
+    purchases: [], cashEntries: [], cashClosings: [], stockAudits: [], sellerProfile: { company: 'Local shop' },
+    activityLog: [], warranties: [], suppliers: [], returns: [], cart: {},
+    renderSaleProducts: () => {}, renderCart: () => {}, renderProducts: () => {},
+    renderHomeProducts: () => {}, renderStock: () => {}, renderTransfer: () => {},
+    renderCustomerSelect: () => {}, renderCustomers: () => {}, renderReports: () => {},
+    renderWarranties: () => {}, renderSuppliers: () => {}, renderReturns: () => {},
+    renderPurchases: () => {}, renderCash: () => {}, refresh: () => {},
+    cloudRefreshAutoSyncUi: () => {}
+  });
+  vm.runInContext(extractTestFunction('cloudClearDownloadBuffers'), context);
+  vm.runInContext(extractTestFunction('onCloudDownloadComplete'), context);
+  return { context, storage, messages, statuses, remote };
+}
+
+test('cloud restore downloads all twelve categories and replaces local data only after validation', () => {
+  const { context, messages, statuses, remote } = cloudRestoreHarness();
+  context.onCloudDownloadComplete(true, 'snapshot-2', 'request-1');
+  assert.equal(context.products[0].id, remote.products[0].id);
+  assert.equal(context.sellerProfile.company, 'Cloud shop');
+  assert.equal(context.cloudBaseSnapshotId, 'snapshot-2');
+  assert.equal(context.cloudDownloadBusy, false);
+  assert.ok(messages.includes('تم استرجاع بيانات السحابة'));
+  assert.ok(statuses.some(status => status.includes('تم استرجاع النسخة السحابية بنجاح')));
+});
+
+test('cloud restore refuses to overwrite local changes made while the download was running', () => {
+  const { context, messages } = cloudRestoreHarness({ dirtyDuringDownload: true });
+  context.onCloudDownloadComplete(true, 'snapshot-2', 'request-1');
+  assert.equal(context.products[0].id, 1);
+  assert.equal(context.cloudSyncConflict, true);
+  assert.equal(context.cloudAutoSyncEnabled, false);
+  assert.ok(messages.includes('تغيرت البيانات أثناء التنزيل؛ لم نستبدلها بالنسخة السحابية'));
+});
+
+test('cloud restore rejects an incomplete remote category without changing local data', () => {
+  const { context, messages, statuses } = cloudRestoreHarness({ missingCategory: 'suppliers' });
+  context.onCloudDownloadComplete(true, 'snapshot-2', 'request-1');
+  assert.equal(context.products[0].id, 1);
+  assert.equal(context.cloudDownloadBusy, false);
+  assert.ok(statuses.some(status => status.includes('تعذر استرجاع النسخة')));
+  assert.ok(messages.includes('النسخة السحابية غير صالحة'));
+});

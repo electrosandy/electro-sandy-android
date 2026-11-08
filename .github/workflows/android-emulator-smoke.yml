@@ -93,15 +93,56 @@ jobs:
           grep -q "package:" "$GITHUB_WORKSPACE/emulator-results/package-path.txt"
           timeout 20s adb shell cmd package resolve-activity --brief "$PACKAGE" | tee "$GITHUB_WORKSPACE/emulator-results/resolved-activity.txt"
           timeout 20s adb shell am force-stop "$PACKAGE"
-          timeout 45s adb shell am start -W -n "$PACKAGE/com.electrosandy.app.MainActivity" | tee "$GITHUB_WORKSPACE/emulator-results/launch.txt"
-          sleep 20
+          timeout 45s adb shell am start -W -n "$PACKAGE/com.electrosandy.app.MainActivity" | tee "$GITHUB_WORKSPACE/emulator-results/launch.txt" || true
+          # A cold WebView can exceed am start -W; wait for the HTML page to finish rendering.
+          page_ready=0
+          for attempt in $(seq 1 90); do
+            if timeout 10s adb logcat -d -s ELECTRO_SMOKE:I 2>/dev/null | grep -q 'DOM_STATE'; then
+              page_ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$page_ready" -ne 1 ]; then
+            echo "WebView did not finish rendering the app within 180 seconds"
+            exit 1
+          fi
+          timeout 20s adb logcat -d -s ELECTRO_SMOKE:I > "$GITHUB_WORKSPACE/emulator-results/page-ready.txt"
+          grep -q 'PAGE_FINISHED' "$GITHUB_WORKSPACE/emulator-results/page-ready.txt"
+          grep -Eq 'bodyLength[^0-9]*[1-9][0-9]{1,}' "$GITHUB_WORKSPACE/emulator-results/page-ready.txt"
           timeout 20s adb shell pidof "$PACKAGE" > "$GITHUB_WORKSPACE/emulator-results/app-pid.txt"
           test -s "$GITHUB_WORKSPACE/emulator-results/app-pid.txt"
           timeout 20s adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/emulator-results/activities.txt"
+          grep -q "topResumedActivity=.*$PACKAGE/com.electrosandy.app.MainActivity" "$GITHUB_WORKSPACE/emulator-results/activities.txt"
+          sleep 5
           timeout 20s adb exec-out screencap -p > "$GITHUB_WORKSPACE/emulator-results/launch-screen.png"
+          cat > "$GITHUB_WORKSPACE/ScreenCheck.java" <<'JAVA'
+          import javax.imageio.ImageIO;
+          import java.awt.image.BufferedImage;
+          import java.io.File;
+          public class ScreenCheck {
+            public static void main(String[] args) throws Exception {
+              BufferedImage image = ImageIO.read(new File(args[0]));
+              if (image == null) throw new IllegalStateException("Screenshot could not be decoded");
+              long colored = 0, sampled = 0;
+              for (int y = 0; y < image.getHeight(); y += 4) {
+                for (int x = 0; x < image.getWidth(); x += 4) {
+                  int rgb = image.getRGB(x, y) & 0x00ffffff;
+                  sampled++;
+                  if (rgb < 0x00f5f5f5) colored++;
+                }
+              }
+              double ratio = sampled == 0 ? 0 : (double) colored / sampled;
+              System.out.println("SCREEN_NONWHITE_RATIO=" + ratio);
+              if (ratio < 0.01) throw new IllegalStateException("App screen is blank or entirely white");
+            }
+          }
+          JAVA
+          javac "$GITHUB_WORKSPACE/ScreenCheck.java"
+          java -cp "$GITHUB_WORKSPACE" ScreenCheck "$GITHUB_WORKSPACE/emulator-results/launch-screen.png" | tee "$GITHUB_WORKSPACE/emulator-results/screen-check.txt"
           adb logcat -b all -d -v time > "$GITHUB_WORKSPACE/emulator-results/logcat.txt"
-          if grep -E "FATAL EXCEPTION|Process: ${PACKAGE}" "$GITHUB_WORKSPACE/emulator-results/logcat.txt"; then
-            echo "Fatal Android crash detected"
+          if grep -E "FATAL EXCEPTION|Process: ${PACKAGE}|ELECTRO_JS.*console\\(" "$GITHUB_WORKSPACE/emulator-results/logcat.txt"; then
+            echo "Fatal Android or JavaScript error detected"
             exit 1
           fi
           echo "EMULATOR_SMOKE_RESULT=PASS" | tee "$GITHUB_WORKSPACE/emulator-results/result.txt"

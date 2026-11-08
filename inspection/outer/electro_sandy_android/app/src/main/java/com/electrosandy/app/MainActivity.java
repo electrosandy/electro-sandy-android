@@ -3,6 +3,8 @@ package com.electrosandy.app;
 import android.app.Activity;
 import android.os.Bundle;
 import android.webkit.WebChromeClient;
+import android.webkit.ConsoleMessage;
+import android.util.Log;
 import android.webkit.WebView;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebViewClient;
@@ -41,6 +43,9 @@ public class MainActivity extends FragmentActivity {
         private final Activity activity;
         private ListenerRegistration cloudSnapshotListener;
         WebAppInterface(Activity activity) { this.activity = activity; }
+        @JavascriptInterface public void reportPageReady(String title, String readyState, int bodyLength) {
+            Log.i("ELECTRO_SMOKE", "BRIDGE_READY title=" + title + " state=" + readyState + " bodyLength=" + bodyLength);
+        }
         void cleanup() {
             if (cloudSnapshotListener != null) {
                 cloudSnapshotListener.remove();
@@ -451,6 +456,16 @@ public class MainActivity extends FragmentActivity {
         webView.addJavascriptInterface(bridge, "AndroidVoice");
         webView.addJavascriptInterface(bridge, "AndroidBiometric");
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                Log.i("ELECTRO_SMOKE", "PAGE_FINISHED url=" + url);
+                view.evaluateJavascript("(function(){var b=document.body;var t=document.title||'';var s=document.readyState;var n=b?(b.innerText||'').length:0;if(window.AndroidShare&&AndroidShare.reportPageReady)AndroidShare.reportPageReady(t,s,n);return JSON.stringify({title:t,readyState:s,bodyLength:n,bodyBackground:b?getComputedStyle(b).backgroundColor:''})})()", value ->
+                    Log.i("ELECTRO_SMOKE", "DOM_STATE " + value));
+            }
+            @Override public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
+                super.onReceivedError(view, request, error);
+                Log.e("ELECTRO_SMOKE", "WEB_ERROR url=" + (request == null ? "" : request.getUrl()) + " code=" + (error == null ? -1 : error.getErrorCode()) + " description=" + (error == null ? "" : error.getDescription()));
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return shouldOverrideUrlLoading(view, request == null || request.getUrl() == null ? null : request.getUrl().toString());
             }
@@ -466,6 +481,12 @@ public class MainActivity extends FragmentActivity {
             }
         });
         webView.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onConsoleMessage(ConsoleMessage message) {
+                if (message != null && message.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+                    Log.e("ELECTRO_JS", "console(" + message.lineNumber() + ") " + message.message() + " @ " + message.sourceId());
+                }
+                return true;
+            }
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (fileCallback != null) fileCallback.onReceiveValue(null);
                 fileCallback = callback;
