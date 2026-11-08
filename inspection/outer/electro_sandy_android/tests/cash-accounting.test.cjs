@@ -11,7 +11,7 @@ const lines = html.split(/\r?\n/);
 function sourceLine(name) {
   const start = html.indexOf('function ' + name + '(');
   assert.ok(start >= 0, 'Missing application function: ' + name);
-  const end = html.indexOf('\\n', start);
+  const end = html.indexOf('\n', start);
   return html.slice(start, end < 0 ? html.length : end);
 }
 
