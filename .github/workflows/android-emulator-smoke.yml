@@ -2,6 +2,8 @@ name: Android Emulator Smoke Test
 
 on:
   workflow_dispatch:
+  push:
+    branches: [inspect-project-zip]
 
 permissions:
   contents: read
@@ -34,7 +36,7 @@ jobs:
         shell: bash
         run: |
           cd "$PROJECT_DIR"
-          node --test tests/cash-accounting.test.cjs
+          node --test tests/cash-accounting.test.cjs tests/financial-regression.test.cjs
 
       - name: Static JavaScript and DOM integrity tests
         shell: bash
