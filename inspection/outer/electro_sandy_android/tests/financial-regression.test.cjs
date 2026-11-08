@@ -536,16 +536,16 @@ test('period report separates net sales, returns, known cost, cash and bank flow
   const { fields, context } = periodReportHarness();
   context.renderPeriodReport();
   const html = fields.periodReportResult.innerHTML;
-  assert.match(html, /المبيعات الصافية<strong>90\\.00 DH/);
-  assert.match(html, /المرتجعات خلال الفترة<strong>10\\.00 DH/);
-  assert.match(html, /تكلفة البضاعة الصافية المعروفة<strong>54\\.00 DH/);
-  assert.match(html, /الربح الإجمالي المعروف<strong>36\\.00 DH/);
-  assert.match(html, /المصاريف المسجلة<strong>7\\.00 DH/);
-  assert.match(html, /مصاريف الصندوق<strong>4\\.00 DH/);
-  assert.match(html, /مصاريف البنك<strong>3\\.00 DH/);
-  assert.match(html, /مداخيل الصندوق<strong>50\\.00 DH/);
-  assert.match(html, /مداخيل البنك<strong>35\\.00 DH/);
-  assert.match(html, /ديون الفواتير<strong>30\\.00 DH/);
+  assert.match(html, /المبيعات الصافية<strong>90\.00 DH/);
+  assert.match(html, /المرتجعات خلال الفترة<strong>10\.00 DH/);
+  assert.match(html, /تكلفة البضاعة الصافية المعروفة<strong>54\.00 DH/);
+  assert.match(html, /الربح الإجمالي المعروف<strong>36\.00 DH/);
+  assert.match(html, /المصاريف المسجلة<strong>7\.00 DH/);
+  assert.match(html, /مصاريف الصندوق<strong>4\.00 DH/);
+  assert.match(html, /مصاريف البنك<strong>3\.00 DH/);
+  assert.match(html, /مداخيل الصندوق<strong>50\.00 DH/);
+  assert.match(html, /مداخيل البنك<strong>35\.00 DH/);
+  assert.match(html, /ديون الفواتير<strong>30\.00 DH/);
   assert.equal(fields.periodReportRows.innerHTML.includes('ES-11'), true);
 });
 
