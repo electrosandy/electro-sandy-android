@@ -80,3 +80,11 @@ test('startup does not parse localStorage JSON without the safe reader', () => {
   assert.ok(directReads.every(match => match.index >= backupStart && match.index < backupEnd));
   assert.match(html, /readStoredJSON\('es13_products',\[\]\)/);
 });
+
+test('product image picker previews selected photos and accepts Android providers with empty MIME types', () => {
+  assert.match(html, /onchange="previewNewProductImages\(this\)"/);
+  assert.match(html, /function previewNewProductImages\(input\)/);
+  assert.match(html, /file\.type&&!String\(file\.type\)\.toLowerCase\(\)\.startsWith\('image\/'\)/);
+  assert.match(html, /تعذرت قراءة ملف الصورة/);
+  assert.match(html, /صيغة الصورة غير مدعومة على هذا الجهاز/);
+});
