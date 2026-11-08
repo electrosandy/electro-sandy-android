@@ -34,3 +34,26 @@ test('literal DOM element lookups resolve to existing IDs', () => {
   const missing = [...new Set(refs.filter(id => !ids.has(id)))];
   assert.deepEqual(missing, []);
 });
+
+test('product photo picker supports up to three images', () => {
+  assert.match(html, /id="newImageFile"[^>]*multiple/);
+  assert.match(html, /baseImages\.length\+files\.length>3/);
+  assert.match(html, /p\.images=allImages;p\.image=allImages\[0\]\|\|''/);
+});
+
+test('legacy single product photos remain visible after multi-photo upgrade', () => {
+  const match = html.match(/function productImageList\(p\)\{([\s\S]*?)\}\nfunction art\(/);
+  assert.ok(match, 'productImageList helper is missing');
+  const getImages = vm.runInNewContext(`(function(p){${match[1]} })`);
+  const legacy = 'data:image/jpeg;base64,legacy';
+  assert.deepEqual(Array.from(getImages({image:legacy})), [legacy]);
+});
+
+test('multi-photo normalization deduplicates, validates and caps images', () => {
+  const match = html.match(/function productImageList\(p\)\{([\s\S]*?)\}\nfunction art\(/);
+  assert.ok(match, 'productImageList helper is missing');
+  const getImages = vm.runInNewContext(`(function(p){${match[1]} })`);
+  const images = [1,2,3,4].map(n => 'data:image/jpeg;base64,'+n);
+  assert.deepEqual(Array.from(getImages({image:images[0],images})), images.slice(0,3));
+  assert.deepEqual(Array.from(getImages({images:['javascript:alert(1)',images[1]]})), [images[1]]);
+});
