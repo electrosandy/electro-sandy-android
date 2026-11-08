@@ -9,7 +9,7 @@ permissions:
 jobs:
   emulator-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
     steps:
       - name: Checkout test branch
         uses: actions/checkout@v4
@@ -67,6 +67,15 @@ jobs:
           ls -lh "$APK"
           PACKAGE="com.electrosandy.app.fresh"
           mkdir -p "$GITHUB_WORKSPACE/emulator-results"
+          capture_failure() {
+            code=$?
+            echo "SMOKE_EXIT_CODE=$code" > "$GITHUB_WORKSPACE/emulator-results/result.txt"
+            timeout 15s adb logcat -d -v time > "$GITHUB_WORKSPACE/emulator-results/logcat-on-failure.txt" 2>&1 || true
+            timeout 15s adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/emulator-results/activities-on-failure.txt" 2>&1 || true
+            timeout 15s adb exec-out screencap -p > "$GITHUB_WORKSPACE/emulator-results/screen-on-failure.png" 2>/dev/null || true
+            exit "$code"
+          }
+          trap capture_failure ERR
           test -s "$APK"
           adb wait-for-device
           booted=0
@@ -97,7 +106,7 @@ jobs:
           chmod +x "$GITHUB_WORKSPACE/emulator-smoke.sh"
 
       - name: Boot emulator, install app and run launch checks
-        timeout-minutes: 12
+        timeout-minutes: 25
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
