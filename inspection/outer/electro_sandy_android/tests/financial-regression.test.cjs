@@ -408,3 +408,40 @@ test('automatic lock clears the active user session and displays the login gate'
   assert.equal(authGate.style.display, 'flex');
   assert.ok(messages.length > 0);
 });
+
+
+test('pre-restore safety backup stores all current business data and verifies the saved snapshot', () => {
+  const storage = new Map();
+  const context = vm.createContext({
+    Math, Number, String, Array, Date,
+    localStorage: {
+      getItem: key => storage.has(key) ? storage.get(key) : null,
+      setItem: (key, value) => storage.set(key, String(value))
+    },
+    products: [{ id: 1 }], orders: [{ id: 2 }], customers: [{ id: 3 }],
+    purchases: [{ id: 4 }], cashEntries: [{ id: 5 }], cashClosings: [{ date: '2026-11-08' }],
+    stockAudits: [], activityLog: [], warranties: [], appUsers: [{ id: 6 }],
+    suppliers: [{ id: 7 }], returns: [{ id: 8 }],
+    sellerProfile: { company: 'ELECTRO Sandy' }
+  });
+  vm.runInContext(oneLineFunction('savePreRestoreSafetyBackup'), context);
+  assert.equal(context.savePreRestoreSafetyBackup(), true);
+  const saved = JSON.parse(storage.get('es13_auto_backups'));
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].data.products[0].id, 1);
+  assert.equal(saved[0].data.cashClosings[0].date, '2026-11-08');
+  assert.equal(saved[0].data.returns[0].id, 8);
+  assert.equal(saved[0].data.sellerProfile.company, 'ELECTRO Sandy');
+});
+
+test('pre-restore safety backup fails closed when storage cannot save the snapshot', () => {
+  const context = vm.createContext({
+    Math, Number, String, Array, Date,
+    localStorage: { getItem: () => '[]', setItem: () => { throw new Error('quota'); } },
+    products: [], orders: [], customers: [], purchases: [], cashEntries: [],
+    cashClosings: [], stockAudits: [], activityLog: [], warranties: [],
+    appUsers: [], suppliers: [], returns: [], sellerProfile: {}
+  });
+  vm.runInContext(oneLineFunction('savePreRestoreSafetyBackup'), context);
+  assert.equal(context.savePreRestoreSafetyBackup(), false);
+});
