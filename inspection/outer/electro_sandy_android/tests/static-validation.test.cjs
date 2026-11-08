@@ -69,7 +69,7 @@ test('corrupted or wrongly shaped local JSON cannot stop app startup', () => {
   storage.value = '{"unexpected":true}';
   assert.deepEqual(Array.from(read('es13_products', [])), []);
   storage.value = '[{"id":1}]';
-  assert.deepEqual(Array.from(read('es13_products', [])), [{id:1}]);
+  assert.equal(JSON.stringify(read('es13_products', [])), '[{"id":1}]');
 });
 
 test('startup does not parse localStorage JSON without the safe reader', () => {
