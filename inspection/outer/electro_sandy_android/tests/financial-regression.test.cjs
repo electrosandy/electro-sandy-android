@@ -593,3 +593,58 @@ test('period CSV export rejects a reversed date range without creating a file', 
   assert.equal(saved.length, 0);
   assert.deepEqual(messages, ['تاريخ البداية خاصو يكون قبل تاريخ النهاية']);
 });
+
+function cashEntryHarness({ amount = '125', note = 'مصاريف نقل', type = 'out', method = 'cash', allowed = true } = {}) {
+  const fields = {
+    cashAmount: { value: amount },
+    cashNote: { value: note, valueSetter: null },
+    cashType: { value: type },
+    cashMethod: { value: method }
+  };
+  const cashEntries = [], messages = [], activities = [];
+  const context = vm.createContext({
+    Math, Number, String, Array, Date,
+    document: { getElementById: id => fields[id] || null },
+    cashEntries,
+    requireRole: () => allowed,
+    save: () => true,
+    renderCash: () => {},
+    logActivity: (...args) => activities.push(args),
+    toast: message => messages.push(message),
+    currentUser: { name: 'Tester' }
+  });
+  vm.runInContext(oneLineFunction('addCashEntry'), context);
+  context.addCashEntry();
+  return { cashEntries, messages, activities, fields };
+}
+
+test('manual cash income is recorded only in the selected cash account', () => {
+  const { cashEntries, fields } = cashEntryHarness({ amount: '125', note: 'مبيعات أخرى', type: 'in', method: 'cash' });
+  assert.equal(cashEntries.length, 1);
+  assert.equal(cashEntries[0].type, 'in');
+  assert.equal(cashEntries[0].method, 'cash');
+  assert.equal(cashEntries[0].amount, 125);
+  assert.equal(fields.cashNote.value, '');
+});
+
+test('manual bank expense is recorded only in the selected bank account', () => {
+  const { cashEntries } = cashEntryHarness({ amount: '80.5', type: 'out', method: 'bank' });
+  assert.equal(cashEntries.length, 1);
+  assert.equal(cashEntries[0].type, 'out');
+  assert.equal(cashEntries[0].method, 'bank');
+  assert.equal(cashEntries[0].amount, 80.5);
+});
+
+test('invalid manual cash entry is rejected without changing balances', () => {
+  for (const options of [{ amount: '0' }, { amount: '-5' }, { note: '   ' }, { type: 'transfer' }, { method: 'other' }]) {
+    const { cashEntries, messages } = cashEntryHarness(options);
+    assert.equal(cashEntries.length, 0);
+    assert.ok(messages.length > 0);
+  }
+});
+
+test('manual cash entry requires administrator permission', () => {
+  const { cashEntries, messages } = cashEntryHarness({ allowed: false });
+  assert.equal(cashEntries.length, 0);
+  assert.equal(messages.length, 0);
+});
