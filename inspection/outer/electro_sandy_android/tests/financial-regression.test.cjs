@@ -103,8 +103,8 @@ test('deferred purchase without a supplier is rejected', () => {
 
 test('financial summary separates original mixed receipts, debt collections, refunds, purchases and expenses', () => {
   const order = {
-    id: 11, payment: 'مختلط / Mixte', total: 100, paidAmount: 80,
-    paidCashAmount: 50, paidBankAmount: 30, balance: 20,
+    id: 11, payment: 'مختلط / Mixte', total: 100, paidAmount: 70,
+    paidCashAmount: 40, paidBankAmount: 30, balance: 20,
     createdAt: '2026-11-08T10:00:00.000Z',
     costMethod: 'weighted_average_verified', costTotal: 60, returnedAmount: 10,
     returnCostTotal: 6, customerId: 4
@@ -127,7 +127,7 @@ test('financial summary separates original mixed receipts, debt collections, ref
   assert.equal(summary.cost, 54);
   assert.equal(summary.grossProfit, 36);
   assert.equal(summary.expenses, 4);
-  assert.equal(summary.cashBalance, 40);
+  assert.equal(summary.cashBalance, 36);
   assert.equal(summary.bankBalance, 20);
   assert.equal(summary.debt, 20);
 });
