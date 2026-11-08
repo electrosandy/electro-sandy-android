@@ -163,9 +163,23 @@ public class MainActivity extends FragmentActivity {
                         watchCloudSnapshot(uid);
                     } else {
                         Exception error = task.getException();
-                        String code = error instanceof FirebaseAuthException
-                            ? ((FirebaseAuthException) error).getErrorCode() : "AUTH_UNKNOWN";
+                        String code = "AUTH_UNKNOWN";
+                        StringBuilder details = new StringBuilder();
+                        Throwable cause = error;
+                        int depth = 0;
+                        while (cause != null && depth++ < 8) {
+                            if (cause instanceof FirebaseAuthException) {
+                                code = ((FirebaseAuthException) cause).getErrorCode();
+                                break;
+                            }
+                            if (details.length() > 0) details.append(" <- ");
+                            details.append(cause.getClass().getSimpleName());
+                            cause = cause.getCause();
+                        }
                         String message = error == null ? "تعذر تسجيل الدخول" : error.getMessage();
+                        if ("AUTH_UNKNOWN".equals(code) && details.length() > 0) {
+                            code = "AUTH_UNKNOWN(" + details.toString() + ")";
+                        }
                         Log.e("ELECTRO_AUTH", "Cloud sign-in failed code=" + code, error);
                         sendCloudJs("window.onCloudAuthResult(false,"+JSONObject.quote(code + ": " + message)+",'')");
                     }
