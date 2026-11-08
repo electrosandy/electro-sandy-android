@@ -334,3 +334,39 @@ test('backup user validation requires a unique active administrator and a suppor
   assert.equal(context.validUserBackup([validAdmin, { ...validAdmin, id: 2, name: 'Other' }]), true);
   assert.equal(context.validUserBackup([validAdmin, { ...validAdmin, name: 'Admin' }]), false);
 });
+
+
+test('customer debt collection updates bank balance, invoice history and loyalty points', () => {
+  const order = {
+    id: 21, invoiceNo: 'ES-21', total: 100, payment: 'دين / Crédit',
+    paidAmount: 0, paidCashAmount: 0, paidBankAmount: 0, balance: 100,
+    customerId: 4, loyaltyPointsEarned: 0
+  };
+  const customer = { id: 4, loyaltyPoints: 0 };
+  const cashEntries = [], messages = [];
+  const context = vm.createContext({
+    Math, Number, String, Array, Date,
+    orders: [order], customers: [customer], cashEntries,
+    currentUser: { name: 'Tester' },
+    requireRole: () => true, askPaymentMethod: () => 'bank',
+    prompt: () => '50', save: () => true,
+    renderReports: () => {}, renderCash: () => {},
+    logActivity: () => {}, toast: message => messages.push(message)
+  });
+  vm.runInContext([
+    oneLineFunction('orderPaidMethodBalances'),
+    blockFunction('payDebt', 'showDebtHistory')
+  ].join('\n'), context);
+  context.payDebt(21);
+  assert.equal(order.paidAmount, 50);
+  assert.equal(order.paidCashAmount, 0);
+  assert.equal(order.paidBankAmount, 50);
+  assert.equal(order.balance, 50);
+  assert.equal(order.paymentHistory.length, 1);
+  assert.equal(order.paymentHistory[0].method, 'bank');
+  assert.equal(customer.loyaltyPoints, 5);
+  assert.equal(cashEntries.length, 1);
+  assert.equal(cashEntries[0].type, 'in');
+  assert.equal(cashEntries[0].method, 'bank');
+  assert.equal(cashEntries[0].amount, 50);
+});
