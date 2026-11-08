@@ -31,7 +31,7 @@ test('cloud sync uses the same complete set of twelve categories in JS, Android 
 });
 
 test('cloudSplit preserves all content and never splits a UTF-16 surrogate pair', () => {
-  const match = html.match(/function cloudSplit\(value,max=100000\)\{[\s\S]*?\n/);
+  const match = html.match(/function cloudSplit\(value,max=24000\)\{[\s\S]*?\n/);
   assert.ok(match, 'cloudSplit helper is missing');
   const cloudSplit = vm.runInNewContext('(' + match[0].trim() + ')');
   const source = 'a😀b'.repeat(20);
@@ -43,6 +43,12 @@ test('cloudSplit preserves all content and never splits a UTF-16 surrogate pair'
     assert.ok(!/^[\uDC00-\uDFFF]/.test(chunk), 'chunk starts with an unpaired low surrogate');
   }
   assert.deepEqual(Array.from(cloudSplit('', 10)), ['']);
+  const unicodePayload = 'مرحبا😀'.repeat(12000);
+  const defaultChunks = cloudSplit(unicodePayload);
+  assert.equal(defaultChunks.join(''), unicodePayload);
+  assert.ok(defaultChunks.every(chunk => Buffer.byteLength(chunk, 'utf8') <= 100000),
+    'every default Firestore chunk must remain under the 100KB UTF-8 rule limit');
+
 });
 
 test('snapshot commit verifies all twelve categories and chunk integrity before moving the current pointer', () => {
