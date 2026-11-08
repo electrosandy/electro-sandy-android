@@ -91,7 +91,8 @@ jobs:
             echo "Android emulator did not finish booting within 3 minutes"
             exit 1
           fi
-          adb logcat -c
+          # Log clearing is best-effort on some emulator images; it must not block app validation.
+          timeout 15s adb logcat -c >/dev/null 2>&1 || true
           timeout 90s adb install -r "$APK" | tee "$GITHUB_WORKSPACE/emulator-results/install.txt"
           timeout 20s adb shell pm path "$PACKAGE" | tee "$GITHUB_WORKSPACE/emulator-results/package-path.txt"
           grep -q "package:" "$GITHUB_WORKSPACE/emulator-results/package-path.txt"
