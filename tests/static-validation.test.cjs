@@ -97,3 +97,23 @@ test('product image picker reports empty selections and verifies saved images', 
   assert.match(html, /productImageList\(persisted\)\.length!==allImages\.length/);
   assert.match(html, /renderHomeProducts\(\);/);
 });
+
+test('loyalty points input accepts Arabic-Indic, Persian and Western digits', () => {
+  assert.match(html, /id="saleRedeemPoints" type="text" inputmode="numeric"/);
+  assert.match(html, /normalizeLoyaltyPointsInput\(this\);updateCartTotals\(\)/);
+  const helpers = html.match(/function normalizeLoyaltyDigits\(value\)[^\n]+function normalizeLoyaltyPointsInput\(input\)[^\n]+function parseLoyaltyPoints\(value\)[^\n]+/);
+  assert.ok(helpers, 'loyalty digit normalization helpers are missing');
+  const context = {};
+  vm.runInNewContext(helpers[0], context);
+  assert.equal(context.parseLoyaltyPoints('123'), 123);
+  assert.equal(context.parseLoyaltyPoints('١٢٣'), 123);
+  assert.equal(context.parseLoyaltyPoints('۱۲۳'), 123);
+  assert.equal(context.parseLoyaltyPoints('٠'), 0);
+  assert.equal(context.parseLoyaltyPoints('12a3'), 123);
+  assert.equal(context.parseLoyaltyPoints(''), 0);
+});
+
+test('checkout and live cart totals use the same normalized loyalty points parser', () => {
+  assert.match(html, /requested=parseLoyaltyPoints\(pointsInput\?\.value\)/);
+  assert.match(html, /requestedPoints=parseLoyaltyPoints\(document\.getElementById\('saleRedeemPoints'\)\?\.value\)/);
+});
