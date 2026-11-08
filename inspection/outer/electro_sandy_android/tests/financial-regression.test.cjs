@@ -131,3 +131,76 @@ test('financial summary separates original mixed receipts, debt collections, ref
   assert.equal(summary.bankBalance, 20);
   assert.equal(summary.debt, 20);
 });
+
+
+function returnHarness({ qty = 1, alreadyReturned = 0 } = {}) {
+  const fields = {
+    returnInvoice: { value: '11' },
+    returnItem: { value: '0' },
+    returnQty: { value: String(qty) },
+    returnReason: { value: 'Damaged item' },
+    returnSerials: { value: '' }
+  };
+  const item = { productId: 3, name: 'Test item', qty: 2, returnedQty: alreadyReturned, unitPrice: 50, unitCost: 20, serials: [] };
+  const order = {
+    id: 11, invoiceNo: 'ES-11', total: 100, subtotal: 100, discountPercent: 0,
+    loyaltyDiscountAmount: 0, balance: 20, paidAmount: 80,
+    paidCashAmount: 50, paidBankAmount: 30, payment: 'مختلط / Mixte',
+    source: 'central', returnedAmount: alreadyReturned * 50,
+    returnedBaseAmount: alreadyReturned * 50, cashRefundTotal: 0,
+    returnCostTotal: alreadyReturned * 20, costMethod: 'weighted_average_verified',
+    costTotal: 40, loyaltyPointsRedeemed: 0, loyaltyPointsRestored: 0,
+    loyaltyPointsEarned: 10, loyaltyPointsReversed: 0, customerId: 4,
+    items: [item]
+  };
+  const product = { id: 3, central: 2, van1: 0, van2: 0, costPrice: 20, costBasisVerified: true, serials: [] };
+  const customer = { id: 4, loyaltyPoints: 10 };
+  const returns = [];
+  const cashEntries = [];
+  const messages = [];
+  const context = vm.createContext({
+    Math, Number, String, Array, Set, Date,
+    document: { getElementById: id => fields[id] || null },
+    orders: [order], products: [product], customers: [customer],
+    returns, cashEntries, warranties: [],
+    requireRole: () => true, save: () => true,
+    toast: message => messages.push(message),
+    renderReturns: () => {}, renderReports: () => {}, renderCash: () => {},
+    renderStock: () => {}, renderProducts: () => {}, renderHomeProducts: () => {},
+    logActivity: () => {}
+  });
+  vm.runInContext([
+    oneLineFunction('orderPaidMethodBalances'),
+    blockFunction('recordReturn', 'saveSupplier')
+  ].join('\n'), context);
+  context.recordReturn();
+  return { item, order, product, customer, returns, cashEntries, messages };
+}
+
+test('mixed-payment return restores stock, offsets debt and splits the cash refund proportionally', () => {
+  const { item, order, product, customer, returns, cashEntries } = returnHarness();
+  assert.equal(item.returnedQty, 1);
+  assert.equal(product.central, 3);
+  assert.equal(order.balance, 0);
+  assert.equal(order.returnedAmount, 50);
+  assert.equal(order.paidAmount, 50);
+  assert.equal(order.paidCashAmount, 31.25);
+  assert.equal(order.paidBankAmount, 18.75);
+  assert.equal(cashEntries.length, 2);
+  assert.equal(cashEntries.find(x => x.method === 'cash').amount, 18.75);
+  assert.equal(cashEntries.find(x => x.method === 'bank').amount, 11.25);
+  assert.equal(customer.loyaltyPoints, 5);
+  assert.equal(returns.length, 1);
+  assert.equal(returns[0].refund, 50);
+});
+
+test('return exceeding the remaining item quantity is rejected without changing stock or balances', () => {
+  const { item, order, product, returns, cashEntries, messages } = returnHarness({ qty: 1, alreadyReturned: 2 });
+  assert.equal(item.returnedQty, 2);
+  assert.equal(product.central, 2);
+  assert.equal(order.paidAmount, 80);
+  assert.equal(order.balance, 20);
+  assert.equal(returns.length, 0);
+  assert.equal(cashEntries.length, 0);
+  assert.ok(messages.length > 0);
+});
