@@ -110,6 +110,12 @@ jobs:
           done
           if [ "$page_ready" -ne 1 ]; then
             echo "WebView did not finish rendering the app within 180 seconds"
+            # Preserve diagnostics on explicit test failures too (ERR traps do not run for exit 1).
+            timeout 20s adb logcat -b all -d -v time > "$GITHUB_WORKSPACE/emulator-results/logcat-page-timeout.txt" 2>&1 || true
+            timeout 20s adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/emulator-results/activities-page-timeout.txt" 2>&1 || true
+            timeout 20s adb shell dumpsys webviewupdate > "$GITHUB_WORKSPACE/emulator-results/webview-provider.txt" 2>&1 || true
+            timeout 20s adb exec-out screencap -p > "$GITHUB_WORKSPACE/emulator-results/screen-page-timeout.png" 2>/dev/null || true
+            grep -E "ELECTRO_SMOKE|ELECTRO_JS|WEB_ERROR|FATAL EXCEPTION|chromium|WebView" "$GITHUB_WORKSPACE/emulator-results/logcat-page-timeout.txt" | tail -n 500 > "$GITHUB_WORKSPACE/emulator-results/webview-diagnostics.txt" || true
             exit 1
           fi
           timeout 20s adb logcat -d -s ELECTRO_SMOKE:I > "$GITHUB_WORKSPACE/emulator-results/page-ready.txt"
