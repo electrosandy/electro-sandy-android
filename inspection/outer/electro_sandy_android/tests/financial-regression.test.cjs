@@ -204,3 +204,91 @@ test('return exceeding the remaining item quantity is rejected without changing 
   assert.equal(cashEntries.length, 0);
   assert.ok(messages.length > 0);
 });
+
+
+function checkoutHarness({ cash = 40, bank = 30, redeem = 20 } = {}) {
+  const fields = {
+    saleSource: { value: 'central' }, saleDiscount: { value: '0' },
+    payment: { value: 'مختلط / Mixte' }, saleCustomer: { value: '4' },
+    saleRedeemPoints: { value: String(redeem) },
+    saleCashAmount: { value: String(cash) }, saleBankAmount: { value: String(bank) }
+  };
+  const product = { id: 3, name: 'Test item', price: 100, central: 5, van1: 0, van2: 0, costPrice: 50, costBasisVerified: true, warrantyMonths: 0, serials: [] };
+  const customer = { id: 4, name: 'Test customer', phone: '', address: '', loyaltyPoints: 50 };
+  const cart = { 3: 1 }, orders = [], warranties = [], messages = [];
+  const context = vm.createContext({
+    Math, Number, String, Array, Object, Date,
+    document: { getElementById: id => fields[id] || null },
+    products: [product], customers: [customer], cart, orders, warranties,
+    sellerProfile: { company: 'ELECTRO Sandy' },
+    currentUser: { id: 1, name: 'Tester', role: 'admin' },
+    requireRole: () => true, save: () => true,
+    addCalendarMonths: date => date,
+    toggleSalePaymentFields: () => {}, renderCart: () => {}, renderSaleProducts: () => {},
+    logActivity: () => {}, toast: message => messages.push(message)
+  });
+  vm.runInContext(oneLineFunction('checkout'), context);
+  context.checkout();
+  return { product, customer, orders, messages, context };
+}
+
+test('mixed sale applies loyalty redemption and earns points only on the amount paid', () => {
+  const { product, customer, orders } = checkoutHarness();
+  const order = orders[0];
+  assert.equal(product.central, 4);
+  assert.equal(order.total, 98);
+  assert.equal(order.loyaltyPointsRedeemed, 20);
+  assert.equal(order.loyaltyDiscountAmount, 2);
+  assert.equal(order.paidCashAmount, 40);
+  assert.equal(order.paidBankAmount, 30);
+  assert.equal(order.paidAmount, 70);
+  assert.equal(order.balance, 28);
+  assert.equal(order.loyaltyPointsEarned, 7);
+  assert.equal(customer.loyaltyPoints, 37);
+});
+
+test('mixed sale rejects payments above the discounted invoice total without mutating stock or loyalty', () => {
+  const { product, customer, orders, messages } = checkoutHarness({ cash: 90, bank: 20, redeem: 0 });
+  assert.equal(product.central, 5);
+  assert.equal(customer.loyaltyPoints, 50);
+  assert.equal(orders.length, 0);
+  assert.ok(messages.length > 0);
+});
+
+function supplierPaymentHarness() {
+  const supplier = { id: 7, name: 'Test supplier' };
+  const purchases = [
+    { id: 1, supplierId: 7, total: 20, paidAmount: 0, balance: 20, paymentHistory: [], createdAt: '2026-11-01T00:00:00.000Z' },
+    { id: 2, supplierId: 7, total: 30, paidAmount: 0, balance: 30, paymentHistory: [], createdAt: '2026-11-02T00:00:00.000Z' }
+  ];
+  const cashEntries = [], messages = [];
+  const context = vm.createContext({
+    Math, Number, String, Array, Date,
+    suppliers: [supplier], purchases, cashEntries,
+    currentUser: { name: 'Tester' },
+    requireRole: () => true, askPaymentMethod: () => 'bank', prompt: () => '35',
+    save: () => true, toast: message => messages.push(message),
+    renderPurchases: () => {}, renderCash: () => {}, renderSuppliers: () => {},
+    logActivity: () => {}
+  });
+  vm.runInContext([
+    oneLineFunction('supplierOutstanding'),
+    blockFunction('paySupplier', 'editSupplier')
+  ].join('\n'), context);
+  context.paySupplier(7);
+  return { purchases, cashEntries, messages };
+}
+
+test('supplier payment allocates oldest payable first and records one bank outflow', () => {
+  const { purchases, cashEntries } = supplierPaymentHarness();
+  assert.equal(purchases[0].paidAmount, 20);
+  assert.equal(purchases[0].balance, 0);
+  assert.equal(purchases[1].paidAmount, 15);
+  assert.equal(purchases[1].balance, 15);
+  assert.equal(purchases[0].paymentHistory[0].method, 'bank');
+  assert.equal(purchases[1].paymentHistory[0].method, 'bank');
+  assert.equal(cashEntries.length, 1);
+  assert.equal(cashEntries[0].amount, 35);
+  assert.equal(cashEntries[0].method, 'bank');
+  assert.equal(cashEntries[0].allocations.length, 2);
+});
