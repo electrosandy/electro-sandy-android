@@ -64,7 +64,7 @@ jobs:
         shell: bash
         run: |
           cd "$PROJECT_DIR"
-          node --test tests/cash-accounting.test.cjs tests/static-validation.test.cjs
+          node --test tests/cash-accounting.test.cjs tests/financial-regression.test.cjs tests/static-validation.test.cjs
 
       - name: Validate embedded JavaScript syntax
         shell: bash
