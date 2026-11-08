@@ -35,6 +35,13 @@ jobs:
           echo "Checking Android assets:"
           find "$PROJECT_DIR" -path "*/assets/www/index.html" -print
 
+      - name: Run financial and static regression tests
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          node --test tests/cash-accounting.test.cjs tests/financial-regression.test.cjs
+          node --test tests/static-validation.test.cjs
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
