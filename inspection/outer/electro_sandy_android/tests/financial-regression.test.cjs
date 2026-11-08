@@ -486,3 +486,77 @@ test('failed local save rolls business arrays back to the last persisted snapsho
   assert.equal(context.cloudSyncConflict, true);
   assert.equal(context.cloudAutoSyncEnabled, false);
 });
+
+
+function periodReportHarness({ from = '2026-11-08', to = '2026-11-08' } = {}) {
+  const fields = {
+    reportFrom: { value: from },
+    reportTo: { value: to },
+    periodReportResult: { innerHTML: '', textContent: '' },
+    periodReportRows: { innerHTML: '' }
+  };
+  const context = vm.createContext({
+    Math, Number, String, Array, Date,
+    orders: [
+      { id: 1, invoiceNo: 'ES-1', createdAt: '2026-11-08T12:00:00.000Z', total: 100, paidAmount: 70, balance: 30, costMethod: 'weighted_average_verified', costTotal: 60, cash: 40, bank: 30, customer: 'Customer A' },
+      { id: 2, invoiceNo: 'ES-2', createdAt: '2026-11-07T23:00:00.000Z', total: 50, paidAmount: 50, balance: 0, costMethod: 'weighted_average_verified', costTotal: 25, cash: 50, bank: 0 }
+    ],
+    returns: [
+      { orderId: 1, invoiceNo: 'ES-1', productName: 'Item A', refund: 10, costReturned: 6, date: '2026-11-08T18:00:00.000Z' }
+    ],
+    cashEntries: [
+      { type: 'out', method: 'cash', amount: 5, note: 'Transport', date: '2026-11-08T14:00:00.000Z' },
+      { type: 'out', method: 'bank', amount: 3, note: 'Internet', date: '2026-11-08T15:00:00.000Z' },
+      { type: 'in', method: 'cash', amount: 2, note: 'Other income', date: '2026-11-08T16:00:00.000Z' }
+    ],
+    document: { getElementById: id => fields[id] || null },
+    periodDate: x => { const d = new Date(x.createdAt || x.id || x.date || 0); return Number.isNaN(d.getTime()) ? null : d; },
+    periodSaleReceipts: (list, entries, method) => list.reduce((sum, order) => sum + Number(order[method] || 0), 0),
+    statementEscape: value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+  });
+  vm.runInContext(blockFunction('renderPeriodReport', 'printPeriodReport'), context);
+  return { context, fields };
+}
+
+test('period report filters invoices and returns by inclusive date range and reconciles cash and bank totals', () => {
+  const { context, fields } = periodReportHarness();
+  context.renderPeriodReport();
+  assert.match(fields.periodReportResult.innerHTML, /المبيعات الصافية<strong>90\.00 DH/);
+  assert.match(fields.periodReportResult.innerHTML, /تكلفة البضاعة الصافية المعروفة<strong>54\.00 DH/);
+  assert.match(fields.periodReportResult.innerHTML, /الربح الإجمالي المعروف<strong>36\.00 DH/);
+  assert.match(fields.periodReportResult.innerHTML, /مصاريف الصندوق<strong>5\.00 DH/);
+  assert.match(fields.periodReportResult.innerHTML, /مصاريف البنك<strong>3\.00 DH/);
+  assert.match(fields.periodReportResult.innerHTML, /مداخيل الصندوق<strong>42\.00 DH/);
+  assert.match(fields.periodReportResult.innerHTML, /مداخيل البنك<strong>30\.00 DH/);
+  assert.match(fields.periodReportResult.innerHTML, /ديون الفواتير<strong>30\.00 DH/);
+  assert.match(fields.periodReportRows.innerHTML, /ES-1/);
+  assert.doesNotMatch(fields.periodReportRows.innerHTML, /ES-2/);
+});
+
+test('period report rejects a reversed date range without rendering misleading totals', () => {
+  const { context, fields } = periodReportHarness({ from: '2026-11-09', to: '2026-11-08' });
+  context.renderPeriodReport();
+  assert.equal(fields.periodReportResult.textContent, 'تاريخ البداية خاصو يكون قبل تاريخ النهاية');
+  assert.equal(fields.periodReportResult.innerHTML, '');
+});
+
+test('period report export includes only invoices inside the selected range and safely quotes CSV fields', () => {
+  const fields = { reportFrom: { value: '2026-11-08' }, reportTo: { value: '2026-11-08' } };
+  let exported = null;
+  const context = vm.createContext({
+    Math, Number, String, Array, Date,
+    orders: [
+      { id: 1, invoiceNo: 'ES-1', createdAt: '2026-11-08T12:00:00.000Z', total: 100, paidAmount: 70, balance: 30, customer: 'A; B' },
+      { id: 2, invoiceNo: 'ES-2', createdAt: '2026-11-07T12:00:00.000Z', total: 50, paidAmount: 50, balance: 0 }
+    ],
+    document: { getElementById: id => fields[id] || null },
+    periodDate: x => { const d = new Date(x.createdAt || x.id || x.date || 0); return Number.isNaN(d.getTime()) ? null : d; },
+    saveTextFile: (name, content, mime) => { exported = { name, content, mime }; }
+  });
+  vm.runInContext(blockFunction('exportPeriodReport', 'exportExcel'), context);
+  context.exportPeriodReport();
+  assert.ok(exported);
+  assert.match(exported.content, /ES-1/);
+  assert.match(exported.content, /"A; B"/);
+  assert.doesNotMatch(exported.content, /ES-2/);
+});
