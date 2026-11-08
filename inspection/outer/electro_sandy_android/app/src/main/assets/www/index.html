@@ -577,6 +577,7 @@ function printPeriodReport(){let from=document.getElementById("reportFrom")?.val
 function exportPeriodReport(){
  let from=document.getElementById("reportFrom")?.value,to=document.getElementById("reportTo")?.value;
  if(!from||!to)return toast("حدد فترة التقرير أولاً");
+ if(new Date(from+"T00:00:00")>new Date(to+"T23:59:59.999"))return toast("تاريخ البداية خاصو يكون قبل تاريخ النهاية");
  let list=orders.filter(o=>{let d=periodDate(o);return d&&d>=new Date(from+"T00:00:00")&&d<=new Date(to+"T23:59:59.999")}),
  rows=[["Invoice","Date","Customer","Salesperson","Total DH","Paid DH","Balance DH"],...list.map(o=>[o.invoiceNo||o.id,o.date,o.customerInfo?.name||o.customer,o.sellerUserName||"",o.total,o.paidAmount??Math.max(0,Number(o.total||0)-Number(o.balance||0)),o.balance||0])],
  quote=v=>'"'+String(v??"").replace(/"/g,'""')+'"',
