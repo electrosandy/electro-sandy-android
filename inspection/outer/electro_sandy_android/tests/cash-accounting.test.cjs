@@ -20,7 +20,8 @@ vm.runInContext([
   "function localDayKey(value){let d=value instanceof Date?value:new Date(value);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}",
   sourceLine('orderPaidMethodBalances'),
   sourceLine('orderInitialPaidMethodBalances'),
-  sourceLine('calculateCashExpectedForDay')
+  sourceLine('calculateCashExpectedForDay'),
+  sourceLine('periodSaleReceipts')
 ].join('\n'), context);
 
 const initialMethods = (order, entries=[]) =>
@@ -93,4 +94,18 @@ test('prior debt collections are excluded from the sale base and from today cash
   const o = orderBase({paidAmount:120, balance:30, paidCashAmount:90, paidBankAmount:30});
   const prior = entry({amount:50, createdAt:'2026-11-07T11:00:00.000Z'});
   assert.equal(dayCash([o],[prior]), 40);
+});
+
+test('period report separates original sale receipts from later debt collections', () => {
+  const o = orderBase({paidAmount:80, paidCashAmount:50, paidBankAmount:30, balance:20});
+  const debt = entry({amount:10});
+  assert.equal(context.periodSaleReceipts([o],[debt],'cash'),40);
+  assert.equal(context.periodSaleReceipts([o],[debt],'bank'),30);
+});
+
+test('credit-only invoices do not appear as initial cash or bank receipts in period reports', () => {
+  const o = orderBase({payment:'دين / Crédit', total:50, paidAmount:20, balance:30, paidCashAmount:20, paidBankAmount:0});
+  const debt = entry({amount:20});
+  assert.equal(context.periodSaleReceipts([o],[debt],'cash'),0);
+  assert.equal(context.periodSaleReceipts([o],[debt],'bank'),0);
 });
