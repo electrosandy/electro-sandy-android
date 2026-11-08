@@ -1,7 +1,9 @@
-
-name: Build Android APK
+name: Build Android APK # Keep product modal save action visible
 
 on:
+  push:
+    branches:
+      - inspect-project-zip
   workflow_dispatch:
 
 jobs:
@@ -12,14 +14,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract Updated ZIP
+      - name: Select Android project source
+        shell: bash
         run: |
-          mkdir project
-          unzip -o electro_sandy_android_fixed.zip -d project
-          echo "Project files:"
-          find project -name settings.gradle -o -name settings.gradle.kts
+          if [ -f inspection/outer/electro_sandy_android/settings.gradle ]; then
+            PROJECT_DIR="$GITHUB_WORKSPACE/inspection/outer/electro_sandy_android"
+          else
+            mkdir -p project
+            unzip -o electro_sandy_android_fixed.zip -d project
+            GRADLE_FILE=$(find project \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)
+            if [ -z "$GRADLE_FILE" ]; then
+              echo "ERROR: Gradle project not found"
+              exit 1
+            fi
+            PROJECT_DIR="$GITHUB_WORKSPACE/$(dirname "$GRADLE_FILE")"
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Selected project directory: $PROJECT_DIR"
           echo "Checking Android assets:"
-          find project -path "*/assets/www/index.html"
+          find "$PROJECT_DIR" -path "*/assets/www/index.html" -print
+
+      - name: Run financial and static regression tests
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          node --test tests/cash-accounting.test.cjs tests/financial-regression.test.cjs
+          node --test tests/static-validation.test.cjs
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -27,23 +48,58 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # Reuse the same runner debug keystore so later APKs can update this install.
+      - name: Restore stable debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: electro-sandy-android-debug-keystore-v1
+
+      - name: Ensure stable debug signing key exists
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -keyalg RSA -keysize 2048 -validity 10000
+          fi
+          test -s "$HOME/.android/debug.keystore"
+
+      - name: Run application regression and static integrity tests
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          node --test tests/cash-accounting.test.cjs tests/financial-regression.test.cjs tests/static-validation.test.cjs
+
+      - name: Validate embedded JavaScript syntax
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const htmlPath = path.join(process.env.PROJECT_DIR, 'app/src/main/assets/www/index.html');
+          const html = fs.readFileSync(htmlPath, 'utf8');
+          const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
+          if (!scripts.length) throw new Error('No embedded JavaScript found');
+          scripts.forEach((match, index) => {
+            new Function(match[1]);
+            console.log(`JavaScript block ${index + 1}: syntax OK`);
+          });
+          NODE
+
       - name: Build Android APK
         run: |
-          GRADLE_FILE=$(find project -name settings.gradle -o -name settings.gradle.kts | head -n 1)
-
-          if [ -z "$GRADLE_FILE" ]; then
-            echo "ERROR: Gradle project not found"
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$GRADLE_FILE")
           cd "$PROJECT_DIR"
-
           gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ELECTRO-Sandy-APK
-          path: project/**/build/outputs/apk/debug/*.apk
+          path: '**/build/outputs/apk/debug/*.apk'
           if-no-files-found: error

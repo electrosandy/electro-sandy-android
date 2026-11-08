@@ -1,0 +1,172 @@
+name: Android Emulator Smoke Test
+
+on:
+  push:
+    branches:
+      - inspect-project-zip
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  emulator-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Checkout test branch
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Select Android project
+        shell: bash
+        run: |
+          if [ -f inspection/outer/electro_sandy_android/settings.gradle ]; then
+            echo "PROJECT_DIR=$GITHUB_WORKSPACE/inspection/outer/electro_sandy_android" >> "$GITHUB_ENV"
+          else
+            echo "ERROR: Android project directory not found"
+            exit 1
+          fi
+
+      - name: Run cash accounting regression tests
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          node --test tests/cash-accounting.test.cjs tests/financial-regression.test.cjs
+
+      - name: Static JavaScript and DOM integrity tests
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          node --test tests/static-validation.test.cjs
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          gradle assembleDebug
+          test -s app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload debug APK for emulator validation
+        uses: actions/upload-artifact@v4
+        with:
+          name: ELECTRO-Sandy-Emulator-APK
+          path: inspection/outer/electro_sandy_android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Prepare emulator smoke script
+        shell: bash
+        run: |
+          cat > "$GITHUB_WORKSPACE/emulator-smoke.sh" <<'BASH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          APK="$GITHUB_WORKSPACE/inspection/outer/electro_sandy_android/app/build/outputs/apk/debug/app-debug.apk"
+          echo "Using APK: $APK"
+          ls -lh "$APK"
+          PACKAGE="com.electrosandy.app.fresh"
+          mkdir -p "$GITHUB_WORKSPACE/emulator-results"
+          capture_failure() {
+            code=$?
+            echo "SMOKE_EXIT_CODE=$code" > "$GITHUB_WORKSPACE/emulator-results/result.txt"
+            timeout 15s adb logcat -d -v time > "$GITHUB_WORKSPACE/emulator-results/logcat-on-failure.txt" 2>&1 || true
+            timeout 15s adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/emulator-results/activities-on-failure.txt" 2>&1 || true
+            timeout 15s adb exec-out screencap -p > "$GITHUB_WORKSPACE/emulator-results/screen-on-failure.png" 2>/dev/null || true
+            exit "$code"
+          }
+          trap capture_failure ERR
+          test -s "$APK"
+          adb wait-for-device
+          booted=0
+          for attempt in $(seq 1 90); do
+            if timeout 10s adb shell getprop sys.boot_completed 2>/dev/null | grep -q '^1'; then booted=1; break; fi
+            sleep 2
+          done
+          if [ "$booted" -ne 1 ]; then
+            echo "Android emulator did not finish booting within 3 minutes"
+            exit 1
+          fi
+          adb logcat -c
+          timeout 90s adb install -r "$APK" | tee "$GITHUB_WORKSPACE/emulator-results/install.txt"
+          timeout 20s adb shell pm path "$PACKAGE" | tee "$GITHUB_WORKSPACE/emulator-results/package-path.txt"
+          grep -q "package:" "$GITHUB_WORKSPACE/emulator-results/package-path.txt"
+          timeout 20s adb shell cmd package resolve-activity --brief "$PACKAGE" | tee "$GITHUB_WORKSPACE/emulator-results/resolved-activity.txt"
+          timeout 20s adb shell am force-stop "$PACKAGE"
+          timeout 45s adb shell am start -W -n "$PACKAGE/com.electrosandy.app.MainActivity" | tee "$GITHUB_WORKSPACE/emulator-results/launch.txt" || true
+          # A cold WebView can exceed am start -W; wait for the HTML page to finish rendering.
+          page_ready=0
+          for attempt in $(seq 1 90); do
+            if timeout 10s adb logcat -d -s ELECTRO_SMOKE:I 2>/dev/null | grep -q 'DOM_STATE'; then
+              page_ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$page_ready" -ne 1 ]; then
+            echo "WebView did not finish rendering the app within 180 seconds"
+            exit 1
+          fi
+          timeout 20s adb logcat -d -s ELECTRO_SMOKE:I > "$GITHUB_WORKSPACE/emulator-results/page-ready.txt"
+          grep -q 'PAGE_FINISHED' "$GITHUB_WORKSPACE/emulator-results/page-ready.txt"
+          grep -Eq 'bodyLength[^0-9]*[1-9][0-9]{1,}' "$GITHUB_WORKSPACE/emulator-results/page-ready.txt"
+          timeout 20s adb shell pidof "$PACKAGE" > "$GITHUB_WORKSPACE/emulator-results/app-pid.txt"
+          test -s "$GITHUB_WORKSPACE/emulator-results/app-pid.txt"
+          timeout 20s adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/emulator-results/activities.txt"
+          grep -q "topResumedActivity=.*$PACKAGE/com.electrosandy.app.MainActivity" "$GITHUB_WORKSPACE/emulator-results/activities.txt"
+          sleep 5
+          timeout 20s adb exec-out screencap -p > "$GITHUB_WORKSPACE/emulator-results/launch-screen.png"
+          cat > "$GITHUB_WORKSPACE/ScreenCheck.java" <<'JAVA'
+          import javax.imageio.ImageIO;
+          import java.awt.image.BufferedImage;
+          import java.io.File;
+          public class ScreenCheck {
+            public static void main(String[] args) throws Exception {
+              BufferedImage image = ImageIO.read(new File(args[0]));
+              if (image == null) throw new IllegalStateException("Screenshot could not be decoded");
+              long colored = 0, sampled = 0;
+              for (int y = 0; y < image.getHeight(); y += 4) {
+                for (int x = 0; x < image.getWidth(); x += 4) {
+                  int rgb = image.getRGB(x, y) & 0x00ffffff;
+                  sampled++;
+                  if (rgb < 0x00f5f5f5) colored++;
+                }
+              }
+              double ratio = sampled == 0 ? 0 : (double) colored / sampled;
+              System.out.println("SCREEN_NONWHITE_RATIO=" + ratio);
+              if (ratio < 0.01) throw new IllegalStateException("App screen is blank or entirely white");
+            }
+          }
+          JAVA
+          javac "$GITHUB_WORKSPACE/ScreenCheck.java"
+          java -cp "$GITHUB_WORKSPACE" ScreenCheck "$GITHUB_WORKSPACE/emulator-results/launch-screen.png" | tee "$GITHUB_WORKSPACE/emulator-results/screen-check.txt"
+          adb logcat -b all -d -v time > "$GITHUB_WORKSPACE/emulator-results/logcat.txt"
+          if grep -E "FATAL EXCEPTION|Process: ${PACKAGE}|ELECTRO_JS.*console\\(" "$GITHUB_WORKSPACE/emulator-results/logcat.txt"; then
+            echo "Fatal Android or JavaScript error detected"
+            exit 1
+          fi
+          echo "EMULATOR_SMOKE_RESULT=PASS" | tee "$GITHUB_WORKSPACE/emulator-results/result.txt"
+          BASH
+          chmod +x "$GITHUB_WORKSPACE/emulator-smoke.sh"
+
+      - name: Boot emulator, install app and run launch checks
+        timeout-minutes: 25
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none
+          script: bash "$GITHUB_WORKSPACE/emulator-smoke.sh"
+
+      - name: Upload emulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ELECTRO-Sandy-Emulator-Smoke-Evidence
+          path: emulator-results/
+          if-no-files-found: warn
