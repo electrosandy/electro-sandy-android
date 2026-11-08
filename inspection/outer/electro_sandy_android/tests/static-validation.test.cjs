@@ -29,8 +29,8 @@ test('inline event handlers reference declared application functions', () => {
 });
 
 test('literal DOM element lookups resolve to existing IDs', () => {
-  const ids = new Set([...html.matchAll(/\\bid\\s*=\\s*["']([^"']+)["']/gi)].map(match => match[1]));
-  const refs = [...html.matchAll(/getElementById\\(\\s*["']([^"']+)["']\\s*\\)/g)].map(match => match[1]);
+  const ids = new Set([...html.matchAll(/\bid\s*=\s*["']([^"']+)["']/gi)].map(match => match[1]));
+  const refs = [...html.matchAll(/getElementById\(\s*["']([^"']+)["']\s*\)/g)].map(match => match[1]);
   const missing = [...new Set(refs.filter(id => !ids.has(id)))];
   assert.deepEqual(missing, []);
 });
