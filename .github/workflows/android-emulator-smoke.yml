@@ -36,6 +36,12 @@ jobs:
           cd "$PROJECT_DIR"
           node --test tests/cash-accounting.test.cjs
 
+      - name: Static JavaScript and DOM integrity tests
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          node --test tests/static-validation.test.cjs
+
       - name: Build debug APK
         shell: bash
         run: |
