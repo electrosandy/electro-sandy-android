@@ -115,5 +115,5 @@ test('loyalty points input accepts Arabic-Indic, Persian and Western digits', ()
 
 test('checkout and live cart totals use the same normalized loyalty points parser', () => {
   assert.match(html, /requested=parseLoyaltyPoints\(pointsInput\?\.value\)/);
-  assert.match(html, /requestedPoints=parseLoyaltyPoints\(document\.getElementById\('saleRedeemPoints'\)\?\.value\)/);
+  assert.match(html, /requestedPoints=\(\(\)=>\{let raw=String\(document\.getElementById\('saleRedeemPoints'\)\?\.value\?\?''\)/);
 });
