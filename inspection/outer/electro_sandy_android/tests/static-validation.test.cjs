@@ -59,7 +59,7 @@ test('multi-photo normalization deduplicates, validates and caps images', () => 
 });
 
 test('corrupted or wrongly shaped local JSON cannot stop app startup', () => {
-  const match = html.match(/function readStoredJSON\\(key,fallback\\)\\{[\\s\\S]*?\\}/);
+  const match = html.match(/function readStoredJSON\(key,fallback\)\{[\s\S]*?\}/);
   assert.ok(match, 'safe local JSON reader is missing');
   const storage = { value: '{broken', getItem() { return this.value; } };
   const read = vm.runInNewContext('(' + match[0] + ')', { localStorage: storage });
@@ -71,6 +71,6 @@ test('corrupted or wrongly shaped local JSON cannot stop app startup', () => {
 });
 
 test('startup does not parse localStorage JSON without the safe reader', () => {
-  assert.doesNotMatch(html, /JSON\\.parse\\(localStorage\\.getItem/);
-  assert.match(html, /readStoredJSON\\('es13_products',\\[\\]\\)/);
+  assert.doesNotMatch(html, /JSON\.parse\(localStorage\.getItem/);
+  assert.match(html, /readStoredJSON\('es13_products',\[\]\)/);
 });
