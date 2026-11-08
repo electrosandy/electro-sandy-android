@@ -60,7 +60,7 @@ test('multi-photo normalization deduplicates, validates and caps images', () => 
 
 test('corrupted or wrongly shaped local JSON cannot stop app startup', () => {
   const start = html.indexOf('function readStoredJSON(');
-  const end = html.indexOf('\nlet products=', start);
+  const end = html.indexOf('\n\nlet products=', start);
   assert.ok(start >= 0 && end > start, 'safe local JSON reader is missing');
   const source = html.slice(start, end).trim();
   const storage = { value: '{broken', getItem() { return this.value; } };
