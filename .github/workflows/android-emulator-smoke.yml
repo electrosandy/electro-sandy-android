@@ -62,7 +62,9 @@ jobs:
           cat > "$GITHUB_WORKSPACE/emulator-smoke.sh" <<'BASH'
           #!/usr/bin/env bash
           set -euo pipefail
-          APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+          APK="$GITHUB_WORKSPACE/inspection/outer/electro_sandy_android/app/build/outputs/apk/debug/app-debug.apk"
+          echo "Using APK: $APK"
+          ls -lh "$APK"
           PACKAGE="com.electrosandy.app.fresh"
           mkdir -p "$GITHUB_WORKSPACE/emulator-results"
           test -s "$APK"
