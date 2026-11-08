@@ -75,13 +75,13 @@ test('cloud restore validates every category payload and saves a local safety ba
 });
 
 test('Android WebView and app viewport disable page pinch zoom', () => {
-  assert.match(java, /setSupportZoom\\(false\\)/);
-  assert.match(java, /setBuiltInZoomControls\\(false\\)/);
-  assert.match(java, /setDisplayZoomControls\\(false\\)/);
+  assert.match(java, /setSupportZoom\(false\)/);
+  assert.match(java, /setBuiltInZoomControls\(false\)/);
+  assert.match(java, /setDisplayZoomControls\(false\)/);
   assert.match(html, /maximum-scale=1,user-scalable=no/);
 });
 
 test('Firebase unknown auth failures preserve nested exception diagnostics for the user', () => {
-  assert.match(java, /causeMessage = cause\\.getMessage\\(\\)/);
+  assert.match(java, /causeMessage = cause\.getMessage\(\)/);
   assert.match(html, /خطأ تقني من Firebase؛ التفاصيل:/);
 });
