@@ -117,3 +117,18 @@ test('checkout and live cart totals use the same normalized loyalty points parse
   assert.match(html, /requested=parseLoyaltyPoints\(pointsInput\?\.value\)/);
   assert.match(html, /requestedPoints=\(\(\)=>\{let raw=String\(document\.getElementById\('saleRedeemPoints'\)\?\.value\?\?''\)/);
 });
+
+
+test('multiple product images survive localStorage serialization and app restart', () => {
+  const imageHelper = html.match(/function productImageList\(p\)\{[^\n]+/);
+  assert.ok(imageHelper, 'productImageList helper is missing');
+  const listImages = vm.runInNewContext('(' + imageHelper[0].replace(/^function productImageList/, 'function') + ')');
+  const images = [1, 2, 3].map(n => 'data:image/jpeg;base64,image-' + n);
+  const storage = { value: null, getItem() { return this.value; }, setItem(_key, value) { this.value = value; } };
+  const originalProduct = { id: 7, name: 'DINEX Type-C 40W', image: images[0], images };
+  storage.setItem('es13_products', JSON.stringify([originalProduct]));
+  const restoredProducts = JSON.parse(storage.getItem('es13_products'));
+  assert.deepEqual(Array.from(listImages(restoredProducts[0])), images);
+  assert.equal(restoredProducts[0].image, images[0]);
+  assert.deepEqual(Array.from(listImages({ image: images[0] })), [images[0]]);
+});
