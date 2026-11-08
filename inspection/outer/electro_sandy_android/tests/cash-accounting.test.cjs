@@ -9,9 +9,10 @@ const htmlPath = path.join(__dirname, '..', 'app', 'src', 'main', 'assets', 'www
 const html = fs.readFileSync(htmlPath, 'utf8');
 const lines = html.split(/\r?\n/);
 function sourceLine(name) {
-  const line = lines.find(value => value.startsWith('function ' + name + '('));
-  assert.ok(line, 'Missing application function: ' + name);
-  return line;
+  const start = html.indexOf('function ' + name + '(');
+  assert.ok(start >= 0, 'Missing application function: ' + name);
+  const end = html.indexOf('\\n', start);
+  return html.slice(start, end < 0 ? html.length : end);
 }
 
 const context = vm.createContext({ Math, Number, String, Array, Date });
