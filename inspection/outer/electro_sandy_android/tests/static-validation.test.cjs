@@ -57,3 +57,20 @@ test('multi-photo normalization deduplicates, validates and caps images', () => 
   assert.deepEqual(Array.from(getImages({image:images[0],images})), images.slice(0,3));
   assert.deepEqual(Array.from(getImages({images:['javascript:alert(1)',images[1]]})), [images[1]]);
 });
+
+test('corrupted or wrongly shaped local JSON cannot stop app startup', () => {
+  const match = html.match(/function readStoredJSON\\(key,fallback\\)\\{[\\s\\S]*?\\}/);
+  assert.ok(match, 'safe local JSON reader is missing');
+  const storage = { value: '{broken', getItem() { return this.value; } };
+  const read = vm.runInNewContext('(' + match[0] + ')', { localStorage: storage });
+  assert.deepEqual(Array.from(read('es13_products', [])), []);
+  storage.value = '{"unexpected":true}';
+  assert.deepEqual(Array.from(read('es13_products', [])), []);
+  storage.value = '[{"id":1}]';
+  assert.deepEqual(Array.from(read('es13_products', [])), [{id:1}]);
+});
+
+test('startup does not parse localStorage JSON without the safe reader', () => {
+  assert.doesNotMatch(html, /JSON\\.parse\\(localStorage\\.getItem/);
+  assert.match(html, /readStoredJSON\\('es13_products',\\[\\]\\)/);
+});
