@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isShopOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function validCategory(category) {
+      return category in [
+        'products', 'orders', 'customers', 'purchases',
+        'cashEntries', 'cashClosings', 'stockAudits',
+        'sellerProfile', 'activityLog', 'warranties',
+        'suppliers', 'returns'
+      ];
+    }
+
+    function validCategoryList(categories) {
+      return categories is list
+        && categories.size() == 12
+        && categories.hasAll([
+          'products', 'orders', 'customers', 'purchases',
+          'cashEntries', 'cashClosings', 'stockAudits',
+          'sellerProfile', 'activityLog', 'warranties',
+          'suppliers', 'returns'
+        ]);
+    }
+
+    match /shops/{userId}/snapshotMeta/current {
+      allow read: if isShopOwner(userId);
+      allow create, update: if isShopOwner(userId)
+        && request.resource.data.keys().hasOnly(['snapshotId', 'categories', 'updatedAt'])
+        && request.resource.data.snapshotId is string
+        && request.resource.data.snapshotId.matches('^[a-z0-9-]{1,64}$')
+        && validCategoryList(request.resource.data.categories)
+        && request.resource.data.updatedAt is int;
+      allow delete: if false;
+    }
+
+    match /shops/{userId}/snapshots/{snapshotId} {
+      allow read: if isShopOwner(userId);
+      allow create, update: if isShopOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'snapshotId', 'categories', 'categoryCount',
+          'createdAt', 'schemaVersion', 'status'
+        ])
+        && request.resource.data.snapshotId == snapshotId
+        && request.resource.data.categoryCount == 12
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.status == 'READY'
+        && request.resource.data.createdAt is int
+        && validCategoryList(request.resource.data.categories);
+      allow delete: if false;
+
+      match /meta/{category} {
+        allow read: if isShopOwner(userId) && validCategory(category);
+        allow create, update: if isShopOwner(userId)
+          && validCategory(category)
+          && request.resource.data.keys().hasOnly(['chunkCount', 'updatedAt'])
+          && request.resource.data.chunkCount is int
+          && request.resource.data.chunkCount >= 1
+          && request.resource.data.chunkCount <= 10000
+          && request.resource.data.updatedAt is int;
+        allow delete: if false;
+      }
+
+      match /data/{category}/chunks/{chunkId} {
+        allow read: if isShopOwner(userId) && validCategory(category);
+        allow create, update: if isShopOwner(userId)
+          && validCategory(category)
+          && chunkId.matches('^[0-9]{6}$')
+          && request.resource.data.keys().hasOnly(['index', 'data', 'updatedAt'])
+          && request.resource.data.index is int
+          && request.resource.data.index >= 0
+          && request.resource.data.index < 10000
+          && request.resource.data.data is string
+          && request.resource.data.data.size() <= 100000
+          && request.resource.data.updatedAt is int;
+        allow delete: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
