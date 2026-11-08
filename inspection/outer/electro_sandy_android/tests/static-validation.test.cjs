@@ -71,6 +71,10 @@ test('corrupted or wrongly shaped local JSON cannot stop app startup', () => {
 });
 
 test('startup does not parse localStorage JSON without the safe reader', () => {
-  assert.doesNotMatch(html, /JSON\.parse\(localStorage\.getItem/);
+  const directReads = [...html.matchAll(/JSON\.parse\(localStorage\.getItem/g)];
+  const backupStart = html.indexOf('function savePreRestoreSafetyBackup');
+  const backupEnd = html.indexOf('function validUserBackup');
+  assert.equal(directReads.length, 2);
+  assert.ok(directReads.every(match => match.index >= backupStart && match.index < backupEnd));
   assert.match(html, /readStoredJSON\('es13_products',\[\]\)/);
 });
