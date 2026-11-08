@@ -24,6 +24,7 @@ import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 import org.json.JSONObject;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -161,8 +162,12 @@ public class MainActivity extends FragmentActivity {
                         sendCloudJs("window.onCloudAuthResult(true,'تم تسجيل الدخول إلى حساب المزامنة',"+JSONObject.quote(uid)+")");
                         watchCloudSnapshot(uid);
                     } else {
-                        String message = task.getException() == null ? "تعذر تسجيل الدخول" : task.getException().getMessage();
-                        sendCloudJs("window.onCloudAuthResult(false,"+JSONObject.quote(message)+",'')");
+                        Exception error = task.getException();
+                        String code = error instanceof FirebaseAuthException
+                            ? ((FirebaseAuthException) error).getErrorCode() : "AUTH_UNKNOWN";
+                        String message = error == null ? "تعذر تسجيل الدخول" : error.getMessage();
+                        Log.e("ELECTRO_AUTH", "Cloud sign-in failed code=" + code, error);
+                        sendCloudJs("window.onCloudAuthResult(false,"+JSONObject.quote(code + ": " + message)+",'')");
                     }
                 });
         }
