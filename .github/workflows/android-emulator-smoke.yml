@@ -56,6 +56,44 @@ jobs:
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
+      - name: Prepare emulator smoke script
+        shell: bash
+        run: |
+          cat > "$GITHUB_WORKSPACE/emulator-smoke.sh" <<'BASH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+          PACKAGE="com.electrosandy.app.fresh"
+          mkdir -p "$GITHUB_WORKSPACE/emulator-results"
+          test -s "$APK"
+          adb wait-for-device
+          booted=0
+          for attempt in $(seq 1 90); do
+            if timeout 10s adb shell getprop sys.boot_completed 2>/dev/null | grep -q '^1'; then booted=1; break; fi
+            sleep 2
+          done
+          if [ "$booted" -ne 1 ]; then
+            echo "Android emulator did not finish booting within 3 minutes"
+            exit 1
+          fi
+          adb logcat -c
+          timeout 90s adb install -r "$APK"
+          timeout 20s adb shell am force-stop "$PACKAGE"
+          timeout 30s adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1
+          sleep 20
+          timeout 20s adb shell pidof "$PACKAGE" > "$GITHUB_WORKSPACE/emulator-results/app-pid.txt"
+          test -s "$GITHUB_WORKSPACE/emulator-results/app-pid.txt"
+          timeout 20s adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/emulator-results/activities.txt"
+          timeout 20s adb exec-out screencap -p > "$GITHUB_WORKSPACE/emulator-results/launch-screen.png"
+          adb logcat -d -v time > "$GITHUB_WORKSPACE/emulator-results/logcat.txt"
+          if grep -E "FATAL EXCEPTION|Process: ${PACKAGE}" "$GITHUB_WORKSPACE/emulator-results/logcat.txt"; then
+            echo "Fatal Android crash detected"
+            exit 1
+          fi
+          echo "EMULATOR_SMOKE_RESULT=PASS" | tee "$GITHUB_WORKSPACE/emulator-results/result.txt"
+          BASH
+          chmod +x "$GITHUB_WORKSPACE/emulator-smoke.sh"
+
       - name: Boot emulator, install app and run launch checks
         timeout-minutes: 12
         uses: reactivecircus/android-emulator-runner@v2
@@ -66,41 +104,7 @@ jobs:
           profile: pixel_2
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
-          script: |
-            set -euo pipefail
-            APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
-            PACKAGE="com.electrosandy.app.fresh"
-            mkdir -p "$GITHUB_WORKSPACE/emulator-results"
-            adb wait-for-device
-            booted=0
-            for attempt in $(seq 1 90); do
-              if [ "$(timeout 10s adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')" = "1" ]; then booted=1; break; fi
-              sleep 2
-            done
-            if [ "$booted" -ne 1 ]; then
-              echo "Android emulator did not finish booting within 3 minutes"
-              exit 1
-            fi
-            adb logcat -c
-            timeout 90s adb install -r "$APK"
-            timeout 20s adb shell am force-stop "$PACKAGE"
-            timeout 30s adb shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1
-            sleep 20
-
-            timeout 20s adb shell pidof "$PACKAGE" > "$GITHUB_WORKSPACE/emulator-results/app-pid.txt"
-            timeout 20s adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/emulator-results/activities.txt"
-            timeout 20s adb exec-out screencap -p > "$GITHUB_WORKSPACE/emulator-results/launch-screen.png"
-            timeout 30s adb shell uiautomator dump /sdcard/electro-window.xml >/dev/null || echo "UIAutomator dump timed out; screenshot and logcat retained"
-            timeout 20s adb pull /sdcard/electro-window.xml "$GITHUB_WORKSPACE/emulator-results/window.xml" || true
-
-            adb logcat -d -v time > "$GITHUB_WORKSPACE/emulator-results/logcat.txt"
-            if grep -E "FATAL EXCEPTION|Process: ${PACKAGE}" "$GITHUB_WORKSPACE/emulator-results/logcat.txt"; then
-              echo "Fatal Android crash detected"
-              exit 1
-            fi
-
-            grep -E "mResumedActivity|ResumedActivity" "$GITHUB_WORKSPACE/emulator-results/activities.txt" || true
-            echo "EMULATOR_SMOKE_RESULT=PASS" | tee "$GITHUB_WORKSPACE/emulator-results/result.txt"
+          script: bash "$GITHUB_WORKSPACE/emulator-smoke.sh"
 
       - name: Upload emulator evidence
         if: always()
