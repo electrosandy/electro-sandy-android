@@ -370,3 +370,41 @@ test('customer debt collection updates bank balance, invoice history and loyalty
   assert.equal(cashEntries[0].method, 'bank');
   assert.equal(cashEntries[0].amount, 50);
 });
+
+
+test('automatic lock timer uses the saved inactivity period and supports disabling it', () => {
+  function timerFor(minutes) {
+    let scheduled = null;
+    const context = vm.createContext({
+      Math, Number, String, Date,
+      currentUser: { id: 1 }, inactivityTimer: 12, lastActivityAt: 0,
+      localStorage: { getItem: () => minutes === null ? null : String(minutes) },
+      clearTimeout: () => {},
+      setTimeout: (callback, delay) => { scheduled = { callback, delay }; return 99; },
+      lockApp: () => {}
+    });
+    vm.runInContext(oneLineFunction('armAutoLock'), context);
+    context.armAutoLock();
+    return { scheduled, lastActivityAt: context.lastActivityAt };
+  }
+  assert.equal(timerFor(5).scheduled.delay, 5 * 60000);
+  assert.equal(timerFor(null).scheduled.delay, 10 * 60000);
+  assert.equal(timerFor(0).scheduled, null);
+});
+
+test('automatic lock clears the active user session and displays the login gate', () => {
+  const authGate = { style: { display: 'none' } }, messages = [];
+  const context = vm.createContext({
+    Math, Number, String, Date,
+    currentUser: { id: 1 }, inactivityTimer: 44,
+    localStorage: { setItem: () => {} },
+    clearTimeout: () => {}, renderLogin: () => {},
+    document: { getElementById: id => id === 'authGate' ? authGate : null },
+    toast: message => messages.push(message)
+  });
+  vm.runInContext(oneLineFunction('lockApp'), context);
+  context.lockApp();
+  assert.equal(context.currentUser, null);
+  assert.equal(authGate.style.display, 'flex');
+  assert.ok(messages.length > 0);
+});
