@@ -1,21 +1,24 @@
-ELECTRO Sandy V17 - Android APK build project
+ELECTRO Sandy V27 — مشروع تطبيق Android لإدارة المبيعات والمخزون
 
-محتويات هذه الحزمة:
-- مشروع Android بسيط يفتح واجهة V17 داخل WebView.
-- اختيار الصور من الجهاز مدعوم عبر نافذة اختيار الملفات.
-- ملف GitHub Actions لبناء APK تلقائياً.
-- أرشيف ELECTRO_Sandy_V17_Development.zip الذي يحتوي على index.html.
+المزايا الرئيسية:
+- واجهة عربية وفرنسية داخل Android WebView.
+- إدارة المنتجات والمخزون والتحويلات والتنبيهات والأرقام التسلسلية والضمان.
+- المبيعات والفواتير والمرتجعات والأداء النقدي والبنكي والمختلط والديون.
+- المشتريات والموردون والأداء الجزئي وتتبع رصيد المورد.
+- الزبناء ونقاط الوفاء وتقارير المبيعات والتكاليف والأرباح والتصدير.
+- النسخ الاحتياطي المحلي والاستعادة الآمنة.
+- مزامنة سحابية عبر Firebase Authentication وCloud Firestore.
+- PIN محلي مشفر باستخدام PBKDF2، مع دعم الدخول بالبصمة عند توفر الجهاز.
 
-طريقة الرفع إلى مستودع GitHub:
-1) فك ضغط هذه الحزمة على جهازك.
-2) افتح مستودع electro-sandy-android في GitHub.
-3) Add file > Upload files.
-4) ارفع كل محتويات المجلد (بما فيها المجلد المخفي .github). تأكد أن workflow موجود في .github/workflows/android.yml وأن ملف ZIP في جذر المستودع.
-5) Commit changes.
-6) افتح Actions ثم Build ELECTRO Sandy APK ثم Run workflow.
-7) بعد نجاح البناء، افتح تشغيل workflow وحمّل Artifact باسم ELECTRO-Sandy-V17-debug-APK.
+البناء والاختبار:
+- المستودع: electrosandy/electro-sandy-android
+- فرع العمل: inspect-project-zip
+- سير بناء APK: .github/workflows/main.yml
+- سير اختبار Android Emulator: .github/workflows/android-emulator-smoke.yml
+- اختبارات Node.js: tests/cash-accounting.test.cjs وtests/static-validation.test.cjs
+- الاختبارات الحالية تشمل حسابات الدفع المختلط والديون والمرتجعات، سلامة JavaScript، معرفات DOM وربط الأزرار.
 
-ملاحظات:
-- الناتج APK تجريبي debug غير موقّع للنشر في Google Play.
-- بيانات النسخة الحالية تبقى محلية على الجهاز؛ لم يتم ربط Supabase أو مزامنة الأجهزة بعد.
-- النسخة النهائية تحتاج اختبار الطباعة والتخزين واختيار الصور على الجهاز المستهدف.
+ملاحظات مهمة:
+- APK الناتج من assembleDebug نسخة Debug للتجربة والتثبيت المباشر، وليس إصداراً Release موقعاً للنشر على Google Play.
+- اختبارات Node.js والفحص البرمجي لا تعوض اختبار الطابعة والكاميرا والبصمة والمزامنة بين هاتفين حقيقيين.
+- لا يتم الدمج إلى main تلقائياً؛ التعديلات الحالية محصورة في فرع inspect-project-zip.
