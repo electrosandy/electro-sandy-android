@@ -174,6 +174,11 @@ public class MainActivity extends FragmentActivity {
                             }
                             if (details.length() > 0) details.append(" <- ");
                             details.append(cause.getClass().getSimpleName());
+                            String causeMessage = cause.getMessage();
+                            if (causeMessage != null && !causeMessage.trim().isEmpty()) {
+                                String safeMessage = causeMessage.replace('\n', ' ').replace('\r', ' ');
+                                details.append(": ").append(safeMessage.length() > 240 ? safeMessage.substring(0, 240) : safeMessage);
+                            }
                             cause = cause.getCause();
                         }
                         String message = error == null ? "تعذر تسجيل الدخول" : error.getMessage();
@@ -460,6 +465,9 @@ public class MainActivity extends FragmentActivity {
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(false);
         webView.getSettings().setSupportMultipleWindows(false);
+        webView.getSettings().setSupportZoom(false);
+        webView.getSettings().setBuiltInZoomControls(false);
+        webView.getSettings().setDisplayZoomControls(false);
         webView.getSettings().setMediaPlaybackRequiresUserGesture(true);
         webView.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         if (android.os.Build.VERSION.SDK_INT >= 26) webView.getSettings().setSafeBrowsingEnabled(true);
