@@ -129,6 +129,12 @@ jobs:
           timeout 180s adb install -r "$APK" | tee "$GITHUB_WORKSPACE/emulator-results/install.txt"
           timeout 20s adb shell pm path "$PACKAGE" | tee "$GITHUB_WORKSPACE/emulator-results/package-path.txt"
           grep -q "package:" "$GITHUB_WORKSPACE/emulator-results/package-path.txt"
+          # Preserve PackageManager's complete view before attempting launch.
+          timeout 25s adb shell dumpsys package "$PACKAGE" > "$GITHUB_WORKSPACE/emulator-results/package-dump.txt" 2>&1 || true
+          timeout 20s adb shell pm list packages -f "$PACKAGE" > "$GITHUB_WORKSPACE/emulator-results/package-list.txt" 2>&1 || true
+          timeout 20s adb shell cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PACKAGE" > "$GITHUB_WORKSPACE/emulator-results/launcher-query.txt" 2>&1 || true
+          timeout 20s adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$PACKAGE" > "$GITHUB_WORKSPACE/emulator-results/launcher-resolve.txt" 2>&1 || true
+          timeout 20s adb shell pm dump "$PACKAGE" > "$GITHUB_WORKSPACE/emulator-results/pm-dump.txt" 2>&1 || true
           timeout 20s adb shell cmd package resolve-activity --brief "$PACKAGE" | tee "$GITHUB_WORKSPACE/emulator-results/resolved-activity.txt"
           timeout 20s adb shell dumpsys webviewupdate > "$GITHUB_WORKSPACE/emulator-results/webview-provider-before-launch.txt" 2>&1 || true
           timeout 20s adb shell am force-stop "$PACKAGE"
