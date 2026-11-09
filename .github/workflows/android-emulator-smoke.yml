@@ -106,8 +106,9 @@ jobs:
           timeout 20s adb shell pm path "$PACKAGE" | tee "$GITHUB_WORKSPACE/emulator-results/package-path.txt"
           grep -q "package:" "$GITHUB_WORKSPACE/emulator-results/package-path.txt"
           timeout 20s adb shell cmd package resolve-activity --brief "$PACKAGE" | tee "$GITHUB_WORKSPACE/emulator-results/resolved-activity.txt"
+          timeout 20s adb shell dumpsys webviewupdate > "$GITHUB_WORKSPACE/emulator-results/webview-provider-before-launch.txt" 2>&1 || true
           timeout 20s adb shell am force-stop "$PACKAGE"
-          timeout 45s adb shell am start -W -n "$PACKAGE/com.electrosandy.app.MainActivity" | tee "$GITHUB_WORKSPACE/emulator-results/launch.txt" || true
+          timeout 45s adb shell am start -W -n "$PACKAGE/com.electrosandy.app.MainActivity" | tee "$GITHUB_WORKSPACE/emulator-results/launch.txt"
           page_ready=0
           for attempt in $(seq 1 90); do
             if timeout 10s adb logcat -d -s ELECTRO_SMOKE:I 2>/dev/null | grep -q 'DOM_STATE'; then
