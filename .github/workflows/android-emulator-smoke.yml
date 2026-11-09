@@ -172,15 +172,15 @@ jobs:
         timeout-minutes: 40
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 34
           target: google_apis
           arch: x86_64
           profile: pixel_2
           cores: 2
-          ram-size: 2048M
+          ram-size: 4096M
           heap-size: 512M
           emulator-boot-timeout: 1500
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -wipe-data -camera-back none -camera-front none
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           script: bash "$GITHUB_WORKSPACE/emulator-smoke.sh"
 
       - name: Upload emulator evidence
