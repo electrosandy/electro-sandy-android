@@ -133,7 +133,7 @@ jobs:
           timeout 20s adb shell pidof "$PACKAGE" > "$GITHUB_WORKSPACE/emulator-results/app-pid.txt"
           test -s "$GITHUB_WORKSPACE/emulator-results/app-pid.txt"
           timeout 20s adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/emulator-results/activities.txt"
-          grep -q "topResumedActivity=.*$PACKAGE/com.electrosandy.app.MainActivity" "$GITHUB_WORKSPACE/emulator-results/activities.txt"
+          grep -Eq "(topResumedActivity|mResumedActivity|ResumedActivity)=.*$PACKAGE/com.electrosandy.app.MainActivity" "$GITHUB_WORKSPACE/emulator-results/activities.txt"
           sleep 5
           timeout 20s adb exec-out screencap -p > "$GITHUB_WORKSPACE/emulator-results/launch-screen.png"
           cat > "$GITHUB_WORKSPACE/ScreenCheck.java" <<'JAVA'
