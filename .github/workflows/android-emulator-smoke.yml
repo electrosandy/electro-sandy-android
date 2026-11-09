@@ -199,7 +199,7 @@ jobs:
           # emulators and are not evidence that ELECTRO Sandy crashed.
           # Keep them in the evidence, but fail only for an ANR involving
           # the app process itself.
-          if grep -Ei "(am_anr|ANR in).*\${PACKAGE}" "$GITHUB_WORKSPACE/emulator-results/logcat.txt"; then
+          if grep -Ei "(am_anr|ANR in).*${PACKAGE}" "$GITHUB_WORKSPACE/emulator-results/logcat.txt"; then
             echo "ELECTRO Sandy process ANR detected"
             exit 1
           fi
