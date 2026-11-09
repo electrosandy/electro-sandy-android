@@ -165,6 +165,10 @@ jobs:
             echo "Fatal Android or JavaScript error detected"
             exit 1
           fi
+          if grep -E "am_anr.*com\\.android\\.(systemui|phone|cellbroadcastreceiver)" "$GITHUB_WORKSPACE/emulator-results/logcat.txt"; then
+            echo "Android emulator system-service ANR detected; screenshot evidence is not considered clean"
+            exit 1
+          fi
           echo "EMULATOR_SMOKE_RESULT=PASS" | tee "$GITHUB_WORKSPACE/emulator-results/result.txt"
           BASH
           chmod +x "$GITHUB_WORKSPACE/emulator-smoke.sh"
@@ -174,7 +178,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
-          target: default
+          target: google_apis
           arch: x86_64
           profile: pixel_2
           cores: 4
