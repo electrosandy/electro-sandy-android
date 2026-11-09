@@ -8,6 +8,7 @@ import android.util.Log;
 import android.webkit.WebView;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebViewClient;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebResourceRequest;
 import android.webkit.ValueCallback;
 import android.content.Intent;
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainActivity extends FragmentActivity {
+    private static boolean rendererRecoveryAttempted = false;
     private WebView webView;
     private WebAppInterface bridge;
 
@@ -492,6 +494,23 @@ public class MainActivity extends FragmentActivity {
             @Override public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
                 super.onReceivedError(view, request, error);
                 Log.e("ELECTRO_SMOKE", "WEB_ERROR url=" + (request == null ? "" : request.getUrl()) + " code=" + (error == null ? -1 : error.getErrorCode()) + " description=" + (error == null ? "" : error.getDescription()));
+            }
+            @Override public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                boolean crashed = detail != null && detail.didCrash();
+                int priority = detail == null ? -1 : detail.rendererPriorityAtExit();
+                Log.e("ELECTRO_WEBVIEW", "Renderer process gone; crashed=" + crashed + " priority=" + priority);
+                if (MainActivity.this.webView == view && !rendererRecoveryAttempted) {
+                    rendererRecoveryAttempted = true;
+                    if (bridge != null) bridge.cleanup();
+                    MainActivity.this.webView = null;
+                    Intent restart = MainActivity.this.getIntent();
+                    MainActivity.this.finish();
+                    MainActivity.this.startActivity(restart);
+                } else if (MainActivity.this.webView == view) {
+                    Log.e("ELECTRO_WEBVIEW", "Renderer recovery already attempted; closing affected activity");
+                    MainActivity.this.finish();
+                }
+                return true;
             }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return shouldOverrideUrlLoading(view, request == null || request.getUrl() == null ? null : request.getUrl().toString());
