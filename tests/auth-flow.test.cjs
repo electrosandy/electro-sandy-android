@@ -174,9 +174,11 @@ test('PIN login creates a session and records the last active user', async () =>
 
 test('role-based navigation blocks restricted pages and permits allowed pages', () => {
   const messages = [];
-  const pages = ['home', 'stock', 'settings'].map(id => ({
-    id, active: false, classList: { toggle(_name, value) { this.active = value; } }
-  }));
+  const pages = ['home', 'stock', 'settings'].map(id => {
+    const page = { id, active: false };
+    page.classList = { toggle(_name, value) { page.active = value; } };
+    return page;
+  });
   const buttons = [{ dataset: { go: 'home' }, classList: { toggle(_name, value) { this.active = value; } } }];
   let stockRendered = 0;
   const context = {
