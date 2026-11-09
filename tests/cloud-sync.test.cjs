@@ -85,3 +85,11 @@ test('Firebase unknown auth failures preserve nested exception diagnostics for t
   assert.match(java, /causeMessage = cause\.getMessage\(\)/);
   assert.match(html, /خطأ تقني من Firebase؛ التفاصيل:/);
 });
+
+test('Firestore snapshot access is owner-only and all unrelated paths default-deny', () => {
+  assert.match(rules, /function isShopOwner\(userId\)\s*\{\s*return request\.auth != null && request\.auth\.uid == userId;/);
+  assert.match(rules, /match \/shops\/\{userId\}\/snapshotMeta\/current\s*\{\s*allow read: if isShopOwner\(userId\);/);
+  assert.match(rules, /match \/\{document=\*\*\}\s*\{\s*allow read, write: if false;/);
+  assert.match(rules, /allow delete: if false;/);
+  assert.doesNotMatch(rules, /allow read, write: if request\.auth != null\s*;/);
+});
