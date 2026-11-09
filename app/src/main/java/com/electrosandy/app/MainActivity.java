@@ -502,7 +502,22 @@ public class MainActivity extends FragmentActivity {
                 if (MainActivity.this.webView == view && !rendererRecoveryAttempted) {
                     rendererRecoveryAttempted = true;
                     if (bridge != null) bridge.cleanup();
-                    MainActivity.this.webView = null;
+                    try {
+                        android.view.ViewParent parent = view.getParent();
+                        if (parent instanceof android.view.ViewGroup) {
+                            ((android.view.ViewGroup) parent).removeView(view);
+                        }
+                        view.stopLoading();
+                        view.removeJavascriptInterface("AndroidShare");
+                        view.removeJavascriptInterface("AndroidScanner");
+                        view.removeJavascriptInterface("AndroidVoice");
+                        view.removeJavascriptInterface("AndroidBiometric");
+                        view.destroy();
+                    } catch (Exception cleanupError) {
+                        Log.w("ELECTRO_WEBVIEW", "Unable to fully clean up crashed WebView", cleanupError);
+                    } finally {
+                        MainActivity.this.webView = null;
+                    }
                     Intent restart = MainActivity.this.getIntent();
                     MainActivity.this.finish();
                     MainActivity.this.startActivity(restart);
