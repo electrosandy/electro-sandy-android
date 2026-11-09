@@ -2,7 +2,7 @@ name: Android Emulator Smoke Test
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, release-candidate-v30]
   pull_request:
     branches: [main, master]
   workflow_dispatch:
