@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "86675449955",
+    "project_id": "electro-sandy",
+    "storage_bucket": "electro-sandy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:86675449955:android:d7272f0e35c15ec250f056",
+        "android_client_info": {
+          "package_name": "com.electrosandy.app.fresh"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAq7WlKDwjgx3cs9ytedzlT70QfDHc3FcU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
