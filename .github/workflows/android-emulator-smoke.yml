@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: android-emulator-smoke-${{ github.event.pull_request.head.ref || github.ref_name }}
+  group: android-emulator-smoke-${{ github.event.pull_request.head.ref || github.ref_name }}-${{ github.sha }}
   cancel-in-progress: true
 
 permissions:
