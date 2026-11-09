@@ -28,6 +28,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
       - name: Select Android project
         shell: bash
         run: |
@@ -54,7 +59,7 @@ jobs:
         shell: bash
         run: |
           cd "$PROJECT_DIR"
-          gradle assembleDebug
+          gradle --no-daemon assembleDebug
           test -s app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload debug APK for emulator validation
