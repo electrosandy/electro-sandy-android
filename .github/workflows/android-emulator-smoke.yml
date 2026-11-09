@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: android-emulator-smoke-${{ github.event.pull_request.number || github.ref }}
+  group: android-emulator-smoke-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
@@ -173,12 +173,12 @@ jobs:
         timeout-minutes: 40
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: 34
           target: default
           arch: x86_64
           profile: pixel_2
-          cores: 2
-          ram-size: 3072M
+          cores: 4
+          ram-size: 4096M
           heap-size: 512M
           emulator-boot-timeout: 900
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
