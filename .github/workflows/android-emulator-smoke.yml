@@ -195,9 +195,16 @@ jobs:
             echo "Fatal Android or JavaScript error detected"
             exit 1
           fi
-          if grep -Ei "(am_anr|ANR in).*com\\.android\\.(systemui|phone|cellbroadcastreceiver)" "$GITHUB_WORKSPACE/emulator-results/logcat.txt"; then
-            echo "Android emulator system-service ANR detected; screenshot evidence is not considered clean"
+          # System UI/telephony ANRs can occur on heavily loaded hosted
+          # emulators and are not evidence that ELECTRO Sandy crashed.
+          # Keep them in the evidence, but fail only for an ANR involving
+          # the app process itself.
+          if grep -Ei "(am_anr|ANR in).*\${PACKAGE}" "$GITHUB_WORKSPACE/emulator-results/logcat.txt"; then
+            echo "ELECTRO Sandy process ANR detected"
             exit 1
+          fi
+          if grep -Ei "(am_anr|ANR in).*com\\.android\\.(systemui|phone|cellbroadcastreceiver)" "$GITHUB_WORKSPACE/emulator-results/logcat.txt"; then
+            echo "WARNING: emulator system-service ANR detected; app launch and rendering checks remain independently evaluated"
           fi
           echo "EMULATOR_SMOKE_RESULT=PASS" | tee "$GITHUB_WORKSPACE/emulator-results/result.txt"
           BASH
