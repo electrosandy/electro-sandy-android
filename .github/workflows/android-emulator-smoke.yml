@@ -17,7 +17,7 @@ permissions:
 jobs:
   emulator-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 55
     steps:
       - name: Checkout test branch
         uses: actions/checkout@v4
@@ -169,18 +169,18 @@ jobs:
           chmod +x "$GITHUB_WORKSPACE/emulator-smoke.sh"
 
       - name: Boot emulator, install app and run launch checks
-        timeout-minutes: 35
+        timeout-minutes: 40
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           target: google_apis
           arch: x86_64
           profile: pixel_2
-          cores: 4
-          ram-size: 4096M
-          heap-size: 1024M
-          emulator-boot-timeout: 1200
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          cores: 2
+          ram-size: 2048M
+          heap-size: 512M
+          emulator-boot-timeout: 1500
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -wipe-data -camera-back none -camera-front none
           script: bash "$GITHUB_WORKSPACE/emulator-smoke.sh"
 
       - name: Upload emulator evidence
