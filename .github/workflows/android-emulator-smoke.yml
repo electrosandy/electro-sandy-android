@@ -86,19 +86,43 @@ jobs:
           trap capture_failure ERR
           test -s "$APK"
           adb wait-for-device
-          # Check boot and both required system services in one adb shell round-trip.
+          # sys.boot_completed alone is not enough: system_server can still be
+          # starting (or restarting), leaving package/settings unavailable.
+          # Require core services and real package/settings commands to pass
+          # repeatedly before attempting installation.
+          ready_streak=0
           ready=0
-          for attempt in $(seq 1 90); do
-            system_state=$(timeout 12s adb shell 'echo BOOT=$(getprop sys.boot_completed); service check package; service check activity' 2>/dev/null | tr -d '\r' || true)
-            if echo "$system_state" | grep -q 'BOOT=1' && [ "$(echo "$system_state" | grep -ic 'found')" -ge 2 ]; then
-              ready=1
-              break
+          for attempt in $(seq 1 150); do
+            system_state=$(timeout 15s adb shell '
+              echo BOOT=$(getprop sys.boot_completed)
+              service check package
+              service check activity
+              service check settings
+              service check window
+              pm path android
+              settings get global device_provisioned
+            ' 2>&1 | tr -d '\r' || true)
+            if echo "$system_state" | grep -q 'BOOT=1' \
+              && echo "$system_state" | grep -q 'Service package: found' \
+              && echo "$system_state" | grep -q 'Service activity: found' \
+              && echo "$system_state" | grep -q 'Service settings: found' \
+              && echo "$system_state" | grep -q 'Service window: found' \
+              && echo "$system_state" | grep -q 'package:/system/framework/framework-res.apk'; then
+              ready_streak=$((ready_streak + 1))
+              if [ "$ready_streak" -ge 3 ]; then
+                ready=1
+                break
+              fi
+            else
+              ready_streak=0
             fi
             sleep 2
           done
           if [ "$ready" -ne 1 ]; then
-            echo "Android emulator system services did not become ready within 3 minutes"
+            echo "Android emulator core services did not remain ready for 3 consecutive checks"
+            printf '%s\\n' "$system_state" > "$GITHUB_WORKSPACE/emulator-results/last-system-state.txt"
             timeout 20s adb shell service list > "$GITHUB_WORKSPACE/emulator-results/services-not-ready.txt" 2>&1 || true
+            timeout 20s adb logcat -b all -d -v time > "$GITHUB_WORKSPACE/emulator-results/logcat-services-not-ready.txt" 2>&1 || true
             exit 1
           fi
           timeout 15s adb logcat -c >/dev/null 2>&1 || true
@@ -185,7 +209,7 @@ jobs:
           ram-size: 4096M
           heap-size: 1024M
           emulator-boot-timeout: 900
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-sim -camera-back none -camera-front none
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-sim -no-snapshot -no-snapshot-save -wipe-data -camera-back none -camera-front none
           script: bash "$GITHUB_WORKSPACE/emulator-smoke.sh"
 
       - name: Upload emulator evidence
