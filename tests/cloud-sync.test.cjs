@@ -85,3 +85,31 @@ test('Firebase unknown auth failures preserve nested exception diagnostics for t
   assert.match(java, /causeMessage = cause\.getMessage\(\)/);
   assert.match(html, /خطأ تقني من Firebase؛ التفاصيل:/);
 });
+
+test('cloud storage watcher marks category deletion and clear operations as local changes', () => {
+  const match = html.match(/function cloudInstallStorageWatcher\\(\\)\\{[\\s\\S]*?\\}function onCloudRemoteSnapshotChanged/);
+  assert.ok(match, 'cloud storage watcher is missing');
+  const watcherSource = match[0].replace(/function onCloudRemoteSnapshotChanged[\\s\\S]*$/, '');
+  let dirty = 0;
+  class FakeStorage {
+    constructor() { this.data = {}; }
+    setItem(key, value) { this.data[String(key)] = String(value); }
+    getItem(key) { return Object.prototype.hasOwnProperty.call(this.data, String(key)) ? this.data[String(key)] : null; }
+    removeItem(key) { delete this.data[String(key)]; }
+    clear() { this.data = {}; }
+  }
+  const local = new FakeStorage();
+  const context = { Storage: FakeStorage, localStorage: local, cloudMarkLocalDirty: () => dirty++ };
+  vm.runInNewContext('(' + watcherSource + ')()', context);
+  local.setItem('es13_products', '[]');
+  assert.equal(dirty, 1, 'tracked writes must mark local data dirty');
+  local.removeItem('es13_products');
+  assert.equal(dirty, 2, 'deleting a synchronized category must mark local data dirty');
+  local.setItem('es13_orders', '[]');
+  local.clear();
+  assert.equal(dirty, 4, 'clearing synchronized data must mark local data dirty');
+  local.clear();
+  assert.equal(dirty, 4, 'clearing storage without synchronized data must not mark it dirty');
+  local.setItem('unrelated_preference', 'x');
+  assert.equal(dirty, 4, 'unrelated local settings must not trigger cloud synchronization');
+});
