@@ -732,6 +732,7 @@ function backupImportHarness({ backup, failKey = null } = {}) {
     renderPurchases: () => {}, renderCash: () => {}, refresh: () => {}
   });
   vm.runInContext(oneLineFunction('savePreRestoreSafetyBackup'), context);
+  vm.runInContext(oneLineFunction('validBackupArrays'), context);
   vm.runInContext(oneLineFunction('validUserBackup'), context);
   vm.runInContext(blockFunction('importBackup', 'restoreAutoBackup'), context);
   const content = JSON.stringify(backup);
@@ -775,6 +776,108 @@ test('backup import rolls back already-written categories when a storage write f
   assert.equal(context.products[0].id, 1);
   assert.equal(JSON.parse(storage.get('es13_products'))[0].id, 1);
   assert.ok(messages.some(message => message.includes('تعذر الاسترجاع بسبب مساحة التخزين')));
+});
+
+
+test('backup import rejects a malformed optional category instead of silently keeping stale local data', () => {
+  const invalid = validBackupFixture();
+  invalid.data.returns = { id: 100 };
+  const { context, storage, messages } = backupImportHarness({ backup: invalid });
+  assert.equal(context.products[0].id, 1);
+  assert.equal(JSON.parse(storage.get('es13_products'))[0].id, 1);
+  assert.equal(storage.has('es13_auto_backups'), false);
+  assert.ok(messages.some(message => message.includes('أقسام غير صالحة')));
+});
+
+function autoBackupRestoreHarness({ snapshot = validBackupFixture().data, failKey = null } = {}) {
+  const storage = new Map();
+  const old = {
+    products: [{ id: 1, name: 'Local product' }], orders: [{ id: 10 }],
+    customers: [{ id: 11 }], purchases: [{ id: 12 }], cashEntries: [{ id: 13 }],
+    cashClosings: [{ id: 14 }], stockAudits: [{ id: 15 }], activityLog: [{ id: 16 }],
+    warranties: [{ id: 17 }], appUsers: [{ id: 1, name: 'Admin', role: 'admin', active: true, pinHash: 'fallback-a' }],
+    suppliers: [{ id: 18 }], returns: [{ id: 19 }], sellerProfile: { company: 'Local shop' }
+  };
+  const keyMap = {
+    products: 'es13_products', orders: 'es13_orders', customers: 'es13_customers',
+    purchases: 'es13_purchases', cashEntries: 'es13_cash', cashClosings: 'es13_cash_closings',
+    stockAudits: 'es13_stock_audits', activityLog: 'es13_activity_log',
+    warranties: 'es13_warranties', appUsers: 'es13_users', suppliers: 'es13_suppliers',
+    returns: 'es13_returns', sellerProfile: 'es13_seller_profile'
+  };
+  for (const [name, key] of Object.entries(keyMap)) storage.set(key, JSON.stringify(old[name]));
+  storage.set('es13_auto_backups', JSON.stringify([{ createdAt: '2026-11-10T12:00:00.000Z', data: snapshot }]));
+  const localStorage = {
+    getItem: key => storage.has(key) ? storage.get(key) : null,
+    setItem: (key, value) => {
+      if (key === failKey) throw new Error('quota');
+      storage.set(key, String(value));
+    },
+    removeItem: key => storage.delete(key)
+  };
+  const messages = [];
+  const context = vm.createContext({
+    Math, Number, String, Array, Set, Date, JSON, localStorage,
+    products: old.products, orders: old.orders, customers: old.customers,
+    purchases: old.purchases, cashEntries: old.cashEntries, cashClosings: old.cashClosings,
+    stockAudits: old.stockAudits, activityLog: old.activityLog, warranties: old.warranties,
+    appUsers: old.appUsers, suppliers: old.suppliers, returns: old.returns,
+    sellerProfile: old.sellerProfile, currentUser: { id: 1, role: 'admin' }, cart: {},
+    requireRole: () => true, confirm: () => true, toast: message => messages.push(message),
+    renderLogin: () => {}, renderSaleProducts: () => {}, renderCart: () => {},
+    renderProducts: () => {}, renderHomeProducts: () => {}, renderStock: () => {},
+    renderTransfer: () => {}, renderCustomerSelect: () => {}, renderCustomers: () => {},
+    renderReports: () => {}, renderWarranties: () => {}, renderUserAdmin: () => {},
+    renderSuppliers: () => {}, renderReturns: () => {}, renderPurchases: () => {},
+    renderCash: () => {}, refresh: () => {}
+  });
+  for (const name of ['readStoredJSON','savePreRestoreSafetyBackup','validBackupArrays','validUserBackup']) {
+    vm.runInContext(oneLineFunction(name), context);
+  }
+  vm.runInContext(blockFunction('restoreAutoBackup', 'showBackupStatus'), context);
+  context.restoreAutoBackup();
+  return { context, storage, messages, old };
+}
+
+test('automatic backup restore validates and restores every category including product photos', () => {
+  const backup = validBackupFixture().data;
+  backup.products[0].image = 'data:image/jpeg;base64,main-photo';
+  backup.products[0].images = [backup.products[0].image, 'data:image/jpeg;base64,second-photo'];
+  const { context, storage, messages } = autoBackupRestoreHarness({ snapshot: backup });
+  assert.equal(context.products[0].id, 2);
+  assert.deepEqual(Array.from(context.products[0].images), backup.products[0].images);
+  assert.equal(context.orders[0].id, 20);
+  assert.equal(context.customers[0].id, 30);
+  assert.equal(context.purchases[0].id, 40);
+  assert.equal(context.cashEntries[0].id, 50);
+  assert.equal(context.cashClosings[0].date, '2026-11-08');
+  assert.equal(context.stockAudits[0].id, 60);
+  assert.equal(context.activityLog[0].id, 70);
+  assert.equal(context.warranties[0].id, 80);
+  assert.equal(context.appUsers[0].id, 1);
+  assert.equal(context.suppliers[0].id, 90);
+  assert.equal(context.returns[0].id, 100);
+  assert.equal(context.sellerProfile.company, 'Restored shop');
+  assert.equal(JSON.parse(storage.get('es13_returns'))[0].id, 100);
+  assert.ok(messages.includes('تم استرجاع النسخة التلقائية بنجاح'));
+});
+
+test('automatic backup restore rejects a malformed category before changing local data', () => {
+  const backup = validBackupFixture().data;
+  backup.warranties = { id: 80 };
+  const { context, storage, messages } = autoBackupRestoreHarness({ snapshot: backup });
+  assert.equal(context.products[0].id, 1);
+  assert.equal(JSON.parse(storage.get('es13_products'))[0].id, 1);
+  assert.ok(messages.some(message => message.includes('النسخة التلقائية ناقصة أو غير صالحة')));
+});
+
+test('automatic backup restore rolls back local categories when a storage write fails', () => {
+  const { context, storage, messages } = autoBackupRestoreHarness({ failKey: 'es13_orders' });
+  assert.equal(context.products[0].id, 1);
+  assert.equal(context.orders[0].id, 10);
+  assert.equal(JSON.parse(storage.get('es13_products'))[0].id, 1);
+  assert.equal(JSON.parse(storage.get('es13_orders'))[0].id, 10);
+  assert.ok(messages.some(message => message.includes('تم إلغاء العملية')));
 });
 
 test('backup import rejects an incomplete backup without replacing local data', () => {
