@@ -81,7 +81,7 @@ test('cloud download rechecks the current snapshot pointer before applying a dow
   const download = java.slice(start, end);
   assert.ok(download.includes("snapshotMeta") && download.includes("latestPointer"), "download must re-read the current snapshot pointer");
   assert.match(download, /تغيرت النسخة السحابية أثناء التنزيل/);
-  assert.ok(download.indexOf('cloudDownloadComplete(true') > download.indexOf('latestPointer'), 'download completes before the latest pointer is verified');
+  assert.ok(download.indexOf('onCloudDownloadComplete(true') > download.indexOf('latestPointer'), 'download completes before the latest pointer is verified');
 });
 
 test('Android WebView and app viewport disable page pinch zoom', () => {
