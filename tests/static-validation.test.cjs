@@ -134,23 +134,19 @@ test('multiple product images survive localStorage serialization and app restart
 });
 
 
+
 test('loyalty input event normalizes typed digits before recalculating totals', () => {
-  const helpers = html.match(/function normalizeLoyaltyDigits\(value\)[^\\n]+function normalizeLoyaltyPointsInput\(input\)[^\\n]+function parseLoyaltyPoints\(value\)[^\\n]+/);
-  assert.ok(helpers, 'loyalty input helpers are missing');
+  const helperStart = html.indexOf('function normalizeLoyaltyDigits(');
+  const helperEnd = html.indexOf('\n', helperStart);
+  const helpers = helperStart >= 0 ? html.slice(helperStart, helperEnd) : '';
+  assert.ok(helpers.includes('function parseLoyaltyPoints('), 'loyalty input helpers are missing');
   const updateStart = html.indexOf('function updateCartTotals(){');
   const updateEnd = html.indexOf('function renderCart(){', updateStart);
   assert.ok(updateStart >= 0 && updateEnd > updateStart, 'live cart totals function is missing');
-  const updateSource = html.slice(updateStart, updateEnd).trim();
-  const elements = Object.fromEntries(['saleRedeemPoints','saleDiscount','saleCustomer','customerPointsAvailable','cartSubtotal','cartDiscount','cartLoyaltyDiscount','cartTotal'].map(id => [id,{value:id==='saleRedeemPoints'?'٠':'0',textContent:''}]));
+  const elements = Object.fromEntries(['saleRedeemPoints','saleDiscount','saleCustomer','customerPointsAvailable','cartSubtotal','cartDiscount','cartLoyaltyDiscount','cartTotal'].map(id => [id,{value:'0',textContent:''}]));
   elements.saleCustomer.value='customer-1';
-  const context = {
-    products:[{id:1,price:100,central:5}],
-    customers:[{id:'customer-1',loyaltyPoints:250}],
-    cart:{1:2},
-    document:{getElementById:id=>elements[id]||null},
-    Number, Math, String
-  };
-  vm.runInNewContext(helpers[0]+'\\n'+updateSource,context);
+  const context = {products:[{id:1,price:100,central:5}],customers:[{id:'customer-1',loyaltyPoints:250}],cart:{1:2},document:{getElementById:id=>elements[id]||null},Number,Math,String};
+  vm.runInNewContext(helpers+'\n'+html.slice(updateStart,updateEnd),context);
   const input=elements.saleRedeemPoints;
   input.value='١٢٣';
   context.normalizeLoyaltyPointsInput(input);
@@ -162,16 +158,18 @@ test('loyalty input event normalizes typed digits before recalculating totals', 
 });
 
 test('loyalty redemption clamps to customer balance and discounted subtotal', () => {
-  const helpers = html.match(/function normalizeLoyaltyDigits\(value\)[^\\n]+function normalizeLoyaltyPointsInput\(input\)[^\\n]+function parseLoyaltyPoints\(value\)[^\\n]+/);
+  const helperStart = html.indexOf('function normalizeLoyaltyDigits(');
+  const helperEnd = html.indexOf('\n', helperStart);
+  const helpers = html.slice(helperStart, helperEnd);
   const updateStart = html.indexOf('function updateCartTotals(){');
   const updateEnd = html.indexOf('function renderCart(){', updateStart);
-  assert.ok(helpers && updateStart >= 0 && updateEnd > updateStart);
+  assert.ok(helperStart >= 0 && updateStart >= 0 && updateEnd > updateStart);
   const elements = Object.fromEntries(['saleRedeemPoints','saleDiscount','saleCustomer','customerPointsAvailable','cartSubtotal','cartDiscount','cartLoyaltyDiscount','cartTotal'].map(id => [id,{value:'0',textContent:''}]));
   elements.saleRedeemPoints.value='9999';
   elements.saleDiscount.value='50';
   elements.saleCustomer.value='customer-1';
   const context = {products:[{id:1,price:100}],customers:[{id:'customer-1',loyaltyPoints:40}],cart:{1:1},document:{getElementById:id=>elements[id]||null},Number,Math,String};
-  vm.runInNewContext(helpers[0]+'\\n'+html.slice(updateStart,updateEnd),context);
+  vm.runInNewContext(helpers+'\n'+html.slice(updateStart,updateEnd),context);
   context.updateCartTotals();
   assert.equal(elements.cartLoyaltyDiscount.textContent,'4.00 DH');
   assert.equal(elements.cartTotal.textContent,'46.00 DH');
