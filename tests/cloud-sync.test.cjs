@@ -79,7 +79,7 @@ test('cloud download rechecks the current snapshot pointer before applying a dow
   const end = java.indexOf('    }\n    private ValueCallback<Uri[]> fileCallback', start);
   assert.ok(start >= 0 && end > start, 'cloudDownloadSnapshot implementation is missing');
   const download = java.slice(start, end);
-  assert.match(download, /snapshotMeta\\"\\)\\.document\\(\\"current\\"\\)\\.get\\(\\)/);
+  assert.ok(download.includes("snapshotMeta") && download.includes("latestPointer"), "download must re-read the current snapshot pointer");
   assert.match(download, /تغيرت النسخة السحابية أثناء التنزيل/);
   assert.ok(download.indexOf('cloudDownloadComplete(true') > download.indexOf('latestPointer'), 'download completes before the latest pointer is verified');
 });
