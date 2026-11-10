@@ -158,3 +158,39 @@ test('cloud storage watcher marks category deletion and clear operations as loca
   local.setItem('unrelated_preference', 'x');
   assert.equal(dirty, 4, 'unrelated local settings must not trigger cloud synchronization');
 });
+
+
+test('queued remote snapshot is retried after a download failure when automatic sync remains safe', () => {
+  const start = html.indexOf('function onCloudDownloadError(');
+  const end = html.indexOf('function cloudRefreshAutoSyncUi(', start);
+  assert.ok(start >= 0 && end > start, 'cloud download error handler is missing');
+  const handler = html.slice(start, end).trim();
+  let retried = 0;
+  let cleared = false;
+  const context = {
+    cloudDownloadRequestId: 'request-1',
+    cloudDownloadBusy: true,
+    cloudDownloadAutomatic: true,
+    cloudPendingRemoteSnapshotId: 'newer-snapshot',
+    cloudAutoSyncEnabled: true,
+    cloudSyncConflict: false,
+    cloudLocalDirty: false,
+    cloudClearDownloadBuffers: () => { context.cloudDownloadBusy = false; cleared = true; },
+    cloudSetStatus: () => {},
+    toast: () => {},
+    cloudTryPendingRemoteDownload: () => {
+      assert.equal(context.cloudDownloadBusy, false, 'retry must wait until the failed download is cleared');
+      retried++;
+    }
+  };
+  const onDownloadError = vm.runInNewContext('(' + handler + ')', context);
+  onDownloadError('network error', 'request-1');
+  assert.equal(cleared, true);
+  assert.equal(retried, 1, 'a queued newer snapshot must be retried after failure');
+  context.cloudDownloadRequestId = 'request-2';
+  context.cloudDownloadBusy = true;
+  context.cloudPendingRemoteSnapshotId = 'another-snapshot';
+  context.cloudLocalDirty = true;
+  onDownloadError('network error', 'request-2');
+  assert.equal(retried, 1, 'do not auto-retry over local edits');
+});
