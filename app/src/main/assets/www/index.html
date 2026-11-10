@@ -665,6 +665,7 @@ function exportBackup(){
  saveTextFile(fileName,JSON.stringify(backup,null,2),'application/json')
 }
 function savePreRestoreSafetyBackup(){try{let list=JSON.parse(localStorage.getItem('es13_auto_backups')||'[]');if(!Array.isArray(list))list=[];const createdAt=new Date().toISOString(),snapshot={createdAt,data:{products,orders,customers,purchases,cashEntries,cashClosings,stockAudits,activityLog,warranties,users:appUsers,suppliers,returns,sellerProfile}};list.unshift(snapshot);localStorage.setItem('es13_auto_backups',JSON.stringify(list.slice(0,2)));const saved=JSON.parse(localStorage.getItem('es13_auto_backups')||'[]');return Array.isArray(saved)&&saved[0]?.createdAt===createdAt}catch(e){return false}}
+function validBackupArrays(data,required){if(!data||typeof data!=='object'||Array.isArray(data)||!Array.isArray(required))return false;const keys=['products','orders','customers','purchases','cashEntries','cashClosings','stockAudits','activityLog','warranties','users','suppliers','returns'];return keys.every(k=>data[k]===undefined?!required.includes(k):Array.isArray(data[k]))&&required.every(k=>Array.isArray(data[k]))}
 function validUserBackup(list){if(!Array.isArray(list)||list.length<1||list.length>1000)return false;let ids=new Set(),names=new Set();for(let u of list){if(!u||typeof u!=='object'||Array.isArray(u)||!Number.isSafeInteger(u.id)||u.id<=0||typeof u.name!=='string'||!u.name.trim()||!['admin','seller','viewer'].includes(u.role)||(u.active!==undefined&&typeof u.active!=='boolean')||typeof u.pinHash!=='string'||u.pinHash.length>256)return false;let name=u.name.trim().toLocaleLowerCase();if(ids.has(u.id)||names.has(name))return false;ids.add(u.id);names.add(name);let hash=u.pinHash;if(!(/^pbkdf2\$[0-9]{5,7}\$[0-9a-f]{32}\$[0-9a-f]{64}$/i.test(hash)||/^[0-9a-f]{64}$/i.test(hash)||/^fallback-[0-9a-f]{1,8}$/i.test(hash)))return false;}return list.some(u=>u.role==='admin'&&u.active!==false)}
 function importBackup(file){if(!requireRole('admin'))return;
  if(!file)return;
@@ -677,8 +678,8 @@ function importBackup(file){if(!requireRole('admin'))return;
   try{
    const parsed=JSON.parse(String(reader.result||''));
    const d=parsed&&parsed.data?parsed.data:parsed;
-   const arrayKeys=['products','orders','customers','purchases','cashEntries'];
-   for(const k of arrayKeys){if(!Array.isArray(d[k]))throw new Error('ملف النسخة ناقص أو غير صالح: '+k)}
+   const requiredArrays=['products','orders','customers','purchases','cashEntries'];
+   if(!validBackupArrays(d,requiredArrays))throw new Error('ملف النسخة ناقص أو يحتوي على أقسام غير صالحة');
    if(!d.sellerProfile||typeof d.sellerProfile!=='object'||Array.isArray(d.sellerProfile))throw new Error('معلومات البائع غير موجودة في النسخة');if(d.users!==undefined&&!validUserBackup(d.users))throw new Error('قائمة المستخدمين في النسخة غير صالحة أو لا تحتوي على مدير نشط');
    if(!confirm('تأكيد الاسترجاع؟ سيتم تعويض البيانات الحالية بالبيانات الموجودة في النسخة الاحتياطية.')){if(input)input.value='';return}
    if(!savePreRestoreSafetyBackup())throw new Error('تعذر حفظ نسخة محلية من البيانات الحالية؛ ألغيت الاستعادة لحمايتها');
@@ -705,7 +706,9 @@ function restoreAutoBackup(){
  try{list=readStoredJSON('es13_auto_backups',[])}catch(e){return toast('تعذر قراءة النسخ التلقائية')}
  if(!Array.isArray(list)||!list.length)return toast('لا توجد نسخة تلقائية بعد');
  let snap=list[0],d=snap?.data;
- if(!d||!Array.isArray(d.products)||!Array.isArray(d.orders))return toast('النسخة التلقائية غير صالحة');if(d.users!==undefined&&!validUserBackup(d.users))return toast('قائمة المستخدمين في النسخة التلقائية غير صالحة');
+ const requiredArrays=['products','orders','customers','purchases','cashEntries','cashClosings','stockAudits','activityLog','warranties','users','suppliers','returns'];
+ if(!validBackupArrays(d,requiredArrays)||!d.sellerProfile||typeof d.sellerProfile!=='object'||Array.isArray(d.sellerProfile))return toast('النسخة التلقائية ناقصة أو غير صالحة');
+ if(!validUserBackup(d.users))return toast('قائمة المستخدمين في النسخة التلقائية غير صالحة');
  if(!confirm('استرجاع النسخة التلقائية بتاريخ '+new Date(snap.createdAt).toLocaleString()+'؟ سيتم تعويض البيانات الحالية.'))return;
  if(!savePreRestoreSafetyBackup())return toast('تعذر حفظ نسخة من البيانات الحالية؛ ألغيت الاستعادة لحمايتها');
  const keys=['es13_products','es13_orders','es13_customers','es13_purchases','es13_cash','es13_cash_closings','es13_stock_audits','es13_activity_log','es13_warranties','es13_users','es13_suppliers','es13_returns','es13_seller_profile'];
