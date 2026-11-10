@@ -87,8 +87,9 @@ test('Firebase unknown auth failures preserve nested exception diagnostics for t
 });
 
 test('cloud storage watcher marks category deletion and clear operations as local changes', () => {
-  const match = html.match(/function cloudInstallStorageWatcher\\(\\)\\{[^}]*\\}[^\\n]*/);
+  const match = html.match(/function cloudInstallStorageWatcher\\(\\)\\{[\\s\\S]*?\\}function onCloudRemoteSnapshotChanged/);
   assert.ok(match, 'cloud storage watcher is missing');
+  const watcherSource = match[0].replace(/function onCloudRemoteSnapshotChanged[\\s\\S]*$/, '');
   let dirty = 0;
   class FakeStorage {
     constructor() { this.data = {}; }
@@ -99,7 +100,7 @@ test('cloud storage watcher marks category deletion and clear operations as loca
   }
   const local = new FakeStorage();
   const context = { Storage: FakeStorage, localStorage: local, cloudMarkLocalDirty: () => dirty++ };
-  vm.runInNewContext('(' + match[0] + ')()', context);
+  vm.runInNewContext('(' + watcherSource + ')()', context);
   local.setItem('es13_products', '[]');
   assert.equal(dirty, 1, 'tracked writes must mark local data dirty');
   local.removeItem('es13_products');
