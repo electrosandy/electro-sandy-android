@@ -175,6 +175,17 @@ jobs:
           test -s "$GITHUB_WORKSPACE/emulator-results/app-pid.txt"
           timeout 20s adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/emulator-results/activities.txt"
           grep -Eq "(topResumedActivity|mResumedActivity|ResumedActivity)[:=].*$PACKAGE/com.electrosandy.app.MainActivity" "$GITHUB_WORKSPACE/emulator-results/activities.txt"
+          # Capture Android's accessibility tree. If the hosted emulator
+          # displays its known System UI ANR dialog, select Wait so it does
+          # not obscure the app screenshot or later UI interactions.
+          timeout 20s adb shell uiautomator dump /sdcard/window.xml > "$GITHUB_WORKSPACE/emulator-results/ui-dump-command.txt" 2>&1 || true
+          timeout 15s adb shell cat /sdcard/window.xml > "$GITHUB_WORKSPACE/emulator-results/ui-before-recovery.xml" 2>/dev/null || true
+          if grep -q 'text="Wait"' "$GITHUB_WORKSPACE/emulator-results/ui-before-recovery.xml"; then
+            timeout 10s adb shell input tap 300 910
+            sleep 5
+            timeout 20s adb shell uiautomator dump /sdcard/window-after.xml > "$GITHUB_WORKSPACE/emulator-results/ui-after-recovery-command.txt" 2>&1 || true
+            timeout 15s adb shell cat /sdcard/window-after.xml > "$GITHUB_WORKSPACE/emulator-results/ui-after-recovery.xml" 2>/dev/null || true
+          fi
           sleep 5
           timeout 20s adb exec-out screencap -p > "$GITHUB_WORKSPACE/emulator-results/launch-screen.png"
           cat > "$GITHUB_WORKSPACE/ScreenCheck.java" <<'JAVA'
