@@ -438,7 +438,24 @@ public class MainActivity extends FragmentActivity {
                                             }
                                             sendCloudJs("window.onCloudChunkReceived("+JSONObject.quote(category)+","+index+","+count+","+JSONObject.quote(data)+","+JSONObject.quote(requestId)+")");
                                         }
-                                        if (completed.incrementAndGet() == categories.size() && !failed.get()) sendCloudJs("window.onCloudDownloadComplete(true,"+JSONObject.quote(snapshotId)+","+JSONObject.quote(requestId)+")");
+                                        if (completed.incrementAndGet() == categories.size() && !failed.get()) {
+                                            // Re-check the current pointer after all chunks are downloaded.
+                                            // If another device committed a newer snapshot mid-download,
+                                            // discard these buffers instead of restoring a stale snapshot.
+                                            db.collection("shops").document(uid).collection("snapshotMeta").document("current").get()
+                                                .addOnSuccessListener(latestPointer -> {
+                                                    String latestId = latestPointer.exists() ? latestPointer.getString("snapshotId") : "";
+                                                    if (latestId == null) latestId = "";
+                                                    if (!snapshotId.equals(latestId)) {
+                                                        if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("تغيرت النسخة السحابية أثناء التنزيل؛ أعد المحاولة للحصول على أحدث نسخة")+","+JSONObject.quote(requestId)+")");
+                                                        return;
+                                                    }
+                                                    if (!failed.get()) sendCloudJs("window.onCloudDownloadComplete(true,"+JSONObject.quote(snapshotId)+","+JSONObject.quote(requestId)+")");
+                                                })
+                                                .addOnFailureListener(e -> {
+                                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+","+JSONObject.quote(requestId)+")");
+                                                });
+                                        }
                                     })
                                     .addOnFailureListener(e -> {
                                         if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+","+JSONObject.quote(requestId)+")");
