@@ -194,3 +194,41 @@ test('queued remote snapshot is retried after a download failure when automatic 
   onDownloadError('network error', 'request-2');
   assert.equal(retried, 1, 'do not auto-retry over local edits');
 });
+
+
+test('automatic cloud upload retries after an offline chunk or category write failure', () => {
+  function runFailureHandler(name, nextName, invoke) {
+    const start = html.indexOf('function ' + name + '(');
+    const end = html.indexOf('function ' + nextName + '(', start + 1);
+    assert.ok(start >= 0 && end > start, name + ' handler is missing');
+    const handler = html.slice(start, end).trim();
+    const timers = [], retryDelays = [], messages = [];
+    const context = {
+      cloudSnapshotId: 'snapshot-1',
+      cloudUploadBusy: true,
+      cloudUploadActive: { category: 'products', count: 1 },
+      cloudUploadQueue: [['orders', '[]']],
+      cloudUploadPending: 1,
+      cloudUploadMode: 'auto',
+      cloudAutoSyncEnabled: true,
+      cloudUploadFailed: false,
+      cloudSetStatus: message => messages.push(message),
+      toast: message => messages.push(message),
+      cloudScheduleAutoSync: delay => retryDelays.push(delay),
+      setTimeout: (callback, delay) => { timers.push({ callback, delay }); return timers.length; },
+      AndroidShare: { cloudFinishCategory: () => {} }
+    };
+    vm.runInNewContext('(' + handler + ')', context)(...invoke);
+    assert.equal(context.cloudUploadBusy, false, 'failed upload must release the busy lock');
+    assert.equal(context.cloudUploadFailed, true);
+    assert.equal(context.cloudUploadQueue.length, 0, 'failed snapshot queue must be discarded');
+    assert.equal(timers.length, 1, 'automatic sync should schedule one retry');
+    assert.equal(timers[0].delay, 1000, 'retry callback should be deferred briefly');
+    timers[0].callback();
+    assert.deepEqual(retryDelays, [60000], 'retry should start a fresh snapshot after one minute');
+  }
+  runFailureHandler('onCloudChunkSaved', 'onCloudCategorySaved',
+    ['products', 0, false, 'network unavailable', 'snapshot-1']);
+  runFailureHandler('onCloudCategorySaved', 'onCloudSnapshotCommitted',
+    ['products', false, 'network unavailable', 'snapshot-1']);
+});
