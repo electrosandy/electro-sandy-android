@@ -84,6 +84,40 @@ test('cloud download rechecks the current snapshot pointer before applying a dow
   assert.ok(download.indexOf('onCloudDownloadComplete(true') > download.indexOf('latestPointer'), 'download completes before the latest pointer is verified');
 });
 
+test('remote snapshot changes received during download are queued and processed afterwards', () => {
+  const start = html.indexOf('function onCloudRemoteSnapshotChanged(');
+  const end = html.indexOf('cloudInstallStorageWatcher();', start);
+  assert.ok(start >= 0 && end > start, 'remote snapshot listener is missing');
+  const handler = html.slice(start, end).trim();
+  let attempts = 0;
+  const context = {
+    cloudAuthUid: 'uid',
+    cloudOwnerUid: 'uid',
+    cloudBaseSnapshotId: 'base',
+    currentUser: { role: 'admin' },
+    cloudUploadBusy: false,
+    cloudDownloadBusy: true,
+    cloudPendingRemoteSnapshotId: '',
+    cloudAutoSyncEnabled: true,
+    cloudLocalDirty: false,
+    cloudSyncConflict: false,
+    cloudTryPendingRemoteDownload: () => attempts++,
+    cloudSetStatus: () => {},
+    toast: () => {},
+    cloudPersistSyncMeta: () => true,
+    cloudRefreshAutoSyncUi: () => {}
+  };
+  const onRemoteChanged = vm.runInNewContext('(' + handler + ')', context);
+  onRemoteChanged('newer-snapshot');
+  assert.equal(context.cloudPendingRemoteSnapshotId, 'newer-snapshot');
+  assert.equal(attempts, 0, 'a second download must not start while the first is active');
+  const restoreStart = html.indexOf('function onCloudDownloadComplete(');
+  const restoreEnd = html.indexOf('function onCloudDownloadError(', restoreStart);
+  const restore = html.slice(restoreStart, restoreEnd);
+  assert.match(restore, /cloudPendingRemoteSnapshotId\)\{if\(cloudAutoSyncEnabled&&!cloudSyncConflict&&!cloudLocalDirty\)cloudTryPendingRemoteDownload\(\)/,
+    'a queued remote update must be processed after the active download finishes');
+});
+
 test('Android WebView and app viewport disable page pinch zoom', () => {
   assert.match(java, /setSupportZoom\(false\)/);
   assert.match(java, /setBuiltInZoomControls\(false\)/);
