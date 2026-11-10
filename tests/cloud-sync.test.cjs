@@ -93,3 +93,31 @@ test('Firestore snapshot access is owner-only and all unrelated paths default-de
   assert.match(rules, /allow delete: if false;/);
   assert.doesNotMatch(rules, /allow read, write: if request\.auth != null\s*;/);
 });
+
+test('cloud restore preserves products created locally after the last cloud snapshot', () => {
+  const match = html.match(/function mergeCloudRestoredProducts\([\s\S]*?\n\}/);
+  assert.ok(match, 'local/cloud product merge helper is missing');
+  const merge = vm.runInNewContext('(' + match[0] + ')');
+  const remote = [
+    { id: 1, name: 'Cloud product', price: 10 },
+    { id: 2, name: 'Shared product from cloud', price: 20 },
+    { barcode: 'REMOTE-1', name: 'Remote barcode product' }
+  ];
+  const local = [
+    { id: 2, name: 'Older local copy', price: 18 },
+    { id: 3, name: 'Local-only product', price: 30 },
+    { barcode: 'LOCAL-1', name: 'Local barcode product' },
+    { id: 3, name: 'Duplicate local ID must not be added twice' }
+  ];
+  const merged = merge(remote, local);
+  assert.deepEqual(Array.from(merged, p => p.name), [
+    'Cloud product',
+    'Shared product from cloud',
+    'Remote barcode product',
+    'Local-only product',
+    'Local barcode product'
+  ]);
+  assert.equal(merged.find(p => p.id === 2).price, 20,
+    'the cloud version remains authoritative for products present in both snapshots');
+  assert.equal(merged.filter(p => p.id === 3).length, 1);
+});
