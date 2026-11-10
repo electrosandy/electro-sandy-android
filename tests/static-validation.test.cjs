@@ -119,6 +119,64 @@ test('checkout and live cart totals use the same normalized loyalty points parse
 });
 
 
+
+test('barcode scan launches the Android camera bridge and remembers its target', () => {
+  const start = html.match(/function startBarcodeScan\(target\)\{[^\n]+/);
+  assert.ok(start, 'startBarcodeScan handler is missing');
+  let scans = 0;
+  const context = {
+    requireRole: () => true,
+    window: { AndroidScanner: { scanBarcode() { scans++; } } },
+    toast() {}
+  };
+  vm.runInNewContext(start[0], context);
+  context.startBarcodeScan('sale');
+  assert.equal(scans, 1);
+  assert.equal(context.barcodeScanTarget, 'sale');
+});
+
+test('barcode result adds a matching product to the sale cart', () => {
+  const handler = html.match(/function onCameraBarcodeScanned\(code\)\{[^\n]+/);
+  assert.ok(handler, 'onCameraBarcodeScanned handler is missing');
+  const input = { value: '' };
+  const added = [], messages = [];
+  const product = { id: 42, name: 'USB-C Charger', barcode: 'ABC-123' };
+  const context = {
+    barcodeScanTarget: 'sale',
+    products: [product],
+    document: { getElementById: id => id === 'saleSearch' ? input : null },
+    renderSaleProducts() {},
+    addCart: id => added.push(id),
+    toast: message => messages.push(message)
+  };
+  vm.runInNewContext(handler[0], context);
+  context.onCameraBarcodeScanned(' abc-123 ');
+  assert.equal(input.value, 'USB-C Charger');
+  assert.deepEqual(added, [42]);
+  assert.match(messages.at(-1), /USB-C Charger/);
+});
+
+test('unknown barcode is placed in the active product search instead of adding a wrong item', () => {
+  const handler = html.match(/function onCameraBarcodeScanned\(code\)\{[^\n]+/);
+  assert.ok(handler, 'onCameraBarcodeScanned handler is missing');
+  const input = { value: '' }, messages = [];
+  let added = 0;
+  const context = {
+    barcodeScanTarget: 'home',
+    products: [{ id: 1, name: 'Existing', barcode: 'KNOWN' }],
+    document: { getElementById: id => id === 'homeProductSearch' ? input : null },
+    renderHomeProducts() {},
+    homeProductQty: {},
+    homeAddToSale() { added++; },
+    toast: message => messages.push(message)
+  };
+  vm.runInNewContext(handler[0], context);
+  context.onCameraBarcodeScanned('UNKNOWN-99');
+  assert.equal(input.value, 'UNKNOWN-99');
+  assert.equal(added, 0);
+  assert.match(messages.at(-1), /لم يتم العثور/);
+});
+
 test('multiple product images survive localStorage serialization and app restart', () => {
   const imageHelper = html.match(/function productImageList\(p\)\{[^\n]+/);
   assert.ok(imageHelper, 'productImageList helper is missing');
