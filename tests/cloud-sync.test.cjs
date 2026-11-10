@@ -124,9 +124,10 @@ test('cloud restore preserves products created locally after the last cloud snap
 
 
 test('cloud restore deduplicates products when one copy has an ID and the other only a barcode', () => {
-  const match = html.match(/function mergeCloudRestoredProducts\([\\s\\S]*?\\n\\}/);
-  assert.ok(match, 'local/cloud product merge helper is missing');
-  const merge = vm.runInNewContext('(' + match[0] + ')');
+  const start = html.indexOf('function mergeCloudRestoredProducts(');
+  const end = html.indexOf('\n}', start);
+  assert.ok(start >= 0 && end > start, 'local/cloud product merge helper is missing');
+  const merge = vm.runInNewContext('(' + html.slice(start, end + 2) + ')');
   const remote = [
     { id: 41, barcode: 'MATCH-41', name: 'Cloud authoritative product' },
     { barcode: 'REMOTE-ONLY', name: 'Remote barcode product' }
