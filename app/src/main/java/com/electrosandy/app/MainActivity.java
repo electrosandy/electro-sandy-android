@@ -488,7 +488,7 @@ public class MainActivity extends FragmentActivity {
             @Override public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 Log.i("ELECTRO_SMOKE", "PAGE_FINISHED url=" + url);
-                view.evaluateJavascript("(function(){var b=document.body;var t=document.title||'';var s=document.readyState;var n=b?(b.innerText||'').length:0;if(window.AndroidShare&&AndroidShare.reportPageReady)AndroidShare.reportPageReady(t,s,n);return JSON.stringify({title:t,readyState:s,bodyLength:n,bodyBackground:b?getComputedStyle(b).backgroundColor:''})})()", value ->
+                view.evaluateJavascript("(function(){var b=document.body;var t=document.title||'';var s=document.readyState;var n=b?(b.innerText||'').length:0;var el=function(id){return !!document.getElementById(id)};var visible=function(id){var e=document.getElementById(id);return !!e&&!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)};var state={title:t,readyState:s,bodyLength:n,bodyBackground:b?getComputedStyle(b).backgroundColor:'',authGateVisible:visible('authGate'),firstAdminNameVisible:visible('firstAdminName'),firstAdminPinVisible:visible('firstAdminPin'),setupAdminButtonVisible:!!document.querySelector('#authContent button'),activePageCount:document.querySelectorAll('.page.active').length,bottomNavButtons:document.querySelectorAll('nav.bottom button').length};if(window.AndroidShare&&AndroidShare.reportPageReady)AndroidShare.reportPageReady(t,s,n);return JSON.stringify(state)})()", value ->
                     Log.i("ELECTRO_SMOKE", "DOM_STATE " + value));
             }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {

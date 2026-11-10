@@ -132,3 +132,45 @@ test('multiple product images survive localStorage serialization and app restart
   assert.equal(restoredProducts[0].image, images[0]);
   assert.deepEqual(Array.from(listImages({ image: images[0] })), [images[0]]);
 });
+
+
+
+test('loyalty input event normalizes typed digits before recalculating totals', () => {
+  const helperStart = html.indexOf('function normalizeLoyaltyDigits(');
+  const helperEnd = html.indexOf('\n', helperStart);
+  const helpers = helperStart >= 0 ? html.slice(helperStart, helperEnd) : '';
+  assert.ok(helpers.includes('function parseLoyaltyPoints('), 'loyalty input helpers are missing');
+  const updateStart = html.indexOf('function updateCartTotals(){');
+  const updateEnd = html.indexOf('function renderCart(){', updateStart);
+  assert.ok(updateStart >= 0 && updateEnd > updateStart, 'live cart totals function is missing');
+  const elements = Object.fromEntries(['saleRedeemPoints','saleDiscount','saleCustomer','customerPointsAvailable','cartSubtotal','cartDiscount','cartLoyaltyDiscount','cartTotal'].map(id => [id,{value:'0',textContent:''}]));
+  elements.saleCustomer.value='customer-1';
+  const context = {products:[{id:1,price:100,central:5}],customers:[{id:'customer-1',loyaltyPoints:250}],cart:{1:2},document:{getElementById:id=>elements[id]||null},Number,Math,String};
+  vm.runInNewContext(helpers+'\n'+html.slice(updateStart,updateEnd),context);
+  const input=elements.saleRedeemPoints;
+  input.value='١٢٣';
+  context.normalizeLoyaltyPointsInput(input);
+  context.updateCartTotals();
+  assert.equal(input.value,'123');
+  assert.equal(elements.cartSubtotal.textContent,'200.00 DH');
+  assert.equal(elements.cartLoyaltyDiscount.textContent,'12.30 DH');
+  assert.equal(elements.cartTotal.textContent,'187.70 DH');
+});
+
+test('loyalty redemption clamps to customer balance and discounted subtotal', () => {
+  const helperStart = html.indexOf('function normalizeLoyaltyDigits(');
+  const helperEnd = html.indexOf('\n', helperStart);
+  const helpers = html.slice(helperStart, helperEnd);
+  const updateStart = html.indexOf('function updateCartTotals(){');
+  const updateEnd = html.indexOf('function renderCart(){', updateStart);
+  assert.ok(helperStart >= 0 && updateStart >= 0 && updateEnd > updateStart);
+  const elements = Object.fromEntries(['saleRedeemPoints','saleDiscount','saleCustomer','customerPointsAvailable','cartSubtotal','cartDiscount','cartLoyaltyDiscount','cartTotal'].map(id => [id,{value:'0',textContent:''}]));
+  elements.saleRedeemPoints.value='9999';
+  elements.saleDiscount.value='50';
+  elements.saleCustomer.value='customer-1';
+  const context = {products:[{id:1,price:100}],customers:[{id:'customer-1',loyaltyPoints:40}],cart:{1:1},document:{getElementById:id=>elements[id]||null},Number,Math,String};
+  vm.runInNewContext(helpers+'\n'+html.slice(updateStart,updateEnd),context);
+  context.updateCartTotals();
+  assert.equal(elements.cartLoyaltyDiscount.textContent,'4.00 DH');
+  assert.equal(elements.cartTotal.textContent,'46.00 DH');
+});

@@ -85,3 +85,62 @@ test('Firebase unknown auth failures preserve nested exception diagnostics for t
   assert.match(java, /causeMessage = cause\.getMessage\(\)/);
   assert.match(html, /خطأ تقني من Firebase؛ التفاصيل:/);
 });
+
+test('Firestore snapshot access is owner-only and all unrelated paths default-deny', () => {
+  assert.match(rules, /function isShopOwner\(userId\)\s*\{\s*return request\.auth != null && request\.auth\.uid == userId;/);
+  assert.match(rules, /match \/shops\/\{userId\}\/snapshotMeta\/current\s*\{\s*allow read: if isShopOwner\(userId\);/);
+  assert.match(rules, /match \/\{document=\*\*\}\s*\{\s*allow read, write: if false;/);
+  assert.match(rules, /allow delete: if false;/);
+  assert.doesNotMatch(rules, /allow read, write: if request\.auth != null\s*;/);
+});
+
+test('cloud restore preserves products created locally after the last cloud snapshot', () => {
+  const match = html.match(/function mergeCloudRestoredProducts\([\s\S]*?\n\}/);
+  assert.ok(match, 'local/cloud product merge helper is missing');
+  const merge = vm.runInNewContext('(' + match[0] + ')');
+  const remote = [
+    { id: 1, name: 'Cloud product', price: 10 },
+    { id: 2, name: 'Shared product from cloud', price: 20 },
+    { barcode: 'REMOTE-1', name: 'Remote barcode product' }
+  ];
+  const local = [
+    { id: 2, name: 'Older local copy', price: 18 },
+    { id: 3, name: 'Local-only product', price: 30 },
+    { barcode: 'LOCAL-1', name: 'Local barcode product' },
+    { id: 3, name: 'Duplicate local ID must not be added twice' }
+  ];
+  const merged = merge(remote, local);
+  assert.deepEqual(Array.from(merged, p => p.name), [
+    'Cloud product',
+    'Shared product from cloud',
+    'Remote barcode product',
+    'Local-only product',
+    'Local barcode product'
+  ]);
+  assert.equal(merged.find(p => p.id === 2).price, 20,
+    'the cloud version remains authoritative for products present in both snapshots');
+  assert.equal(merged.filter(p => p.id === 3).length, 1);
+});
+
+
+test('cloud restore deduplicates products when one copy has an ID and the other only a barcode', () => {
+  const start = html.indexOf('function mergeCloudRestoredProducts(');
+  const end = html.indexOf('\n}', start);
+  assert.ok(start >= 0 && end > start, 'local/cloud product merge helper is missing');
+  const merge = vm.runInNewContext('(' + html.slice(start, end + 2) + ')');
+  const remote = [
+    { id: 41, barcode: 'MATCH-41', name: 'Cloud authoritative product' },
+    { barcode: 'REMOTE-ONLY', name: 'Remote barcode product' }
+  ];
+  const local = [
+    { barcode: 'MATCH-41', name: 'Same product without local ID' },
+    { id: 42, barcode: 'LOCAL-42', name: 'Local-only product' },
+    { id: 43, barcode: 'REMOTE-ONLY', name: 'Duplicate remote barcode product' }
+  ];
+  const merged = merge(remote, local);
+  assert.deepEqual(Array.from(merged, p => p.name), [
+    'Cloud authoritative product',
+    'Remote barcode product',
+    'Local-only product'
+  ]);
+});

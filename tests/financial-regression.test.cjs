@@ -817,14 +817,17 @@ function cloudRestoreHarness({ dirtyDuringDownload = false, missingCategory = nu
     cloudRefreshAutoSyncUi: () => {}
   });
   vm.runInContext(extractTestFunction('cloudClearDownloadBuffers'), context);
+  vm.runInContext(extractTestFunction('mergeCloudRestoredProducts'), context);
   vm.runInContext(extractTestFunction('onCloudDownloadComplete'), context);
   return { context, storage, messages, statuses, remote };
 }
 
-test('cloud restore downloads all twelve categories and replaces local data only after validation', () => {
+test('cloud restore downloads all twelve categories and preserves local-only products after validation', () => {
   const { context, messages, statuses, remote } = cloudRestoreHarness();
   context.onCloudDownloadComplete(true, 'snapshot-2', 'request-1');
   assert.equal(context.products[0].id, remote.products[0].id);
+  assert.equal(context.products.length, 2);
+  assert.equal(context.products[1].id, 1, 'local-only product remains available after restore');
   assert.equal(context.sellerProfile.company, 'Cloud shop');
   assert.equal(context.cloudBaseSnapshotId, 'snapshot-2');
   assert.equal(context.cloudDownloadBusy, false);
