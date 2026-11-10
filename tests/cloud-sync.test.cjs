@@ -74,6 +74,16 @@ test('cloud restore validates every category payload and saves a local safety ba
   assert.ok(restore.indexOf('savePreRestoreSafetyBackup()') < restore.indexOf('localStorage.setItem(k,JSON.stringify(values[i]))'));
 });
 
+test('cloud download rechecks the current snapshot pointer before applying a downloaded snapshot', () => {
+  const start = java.indexOf('@JavascriptInterface public void cloudDownloadSnapshot(');
+  const end = java.indexOf('    }\n    private ValueCallback<Uri[]> fileCallback', start);
+  assert.ok(start >= 0 && end > start, 'cloudDownloadSnapshot implementation is missing');
+  const download = java.slice(start, end);
+  assert.match(download, /snapshotMeta\\"\\)\\.document\\(\\"current\\"\\)\\.get\\(\\)/);
+  assert.match(download, /تغيرت النسخة السحابية أثناء التنزيل/);
+  assert.ok(download.indexOf('cloudDownloadComplete(true') > download.indexOf('latestPointer'), 'download completes before the latest pointer is verified');
+});
+
 test('Android WebView and app viewport disable page pinch zoom', () => {
   assert.match(java, /setSupportZoom\(false\)/);
   assert.match(java, /setBuiltInZoomControls\(false\)/);
