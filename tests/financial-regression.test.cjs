@@ -23,7 +23,7 @@ function blockFunction(name, nextName) {
   return html.slice(start, close + 1);
 }
 
-function purchaseHarness({ mode = 'partial', paid = 30, method = 'bank', supplier = true } = {}) {
+function purchaseHarness({ mode = 'partial', paid = 30, method = 'bank', supplier = true, offline = false } = {}) {
   const fields = {
     purchaseSupplier: { value: supplier ? '7' : '' },
     purchaseProduct: { value: '3' },
@@ -38,16 +38,18 @@ function purchaseHarness({ mode = 'partial', paid = 30, method = 'bank', supplie
   const purchases = [];
   const cashEntries = [];
   const messages = [];
+  const storage = new Map();
   const context = vm.createContext({
     Math, Number, String, Array, Set, Date,
     document: { getElementById: id => fields[id] || null },
+    navigator: { onLine: !offline },
     products: [product],
     suppliers: supplier ? [{ id: 7, name: 'Test supplier' }] : [],
     purchases,
     cashEntries,
     currentUser: { name: 'Tester' },
     requireRole: () => true,
-    save: () => true,
+    save: () => { storage.set('es13_products', JSON.stringify([product])); storage.set('es13_purchases', JSON.stringify(purchases)); storage.set('es13_cash', JSON.stringify(cashEntries)); return true; },
     toast: message => messages.push(message),
     togglePurchasePayment: () => {},
     renderPurchases: () => {},
@@ -56,7 +58,7 @@ function purchaseHarness({ mode = 'partial', paid = 30, method = 'bank', supplie
   });
   vm.runInContext(oneLineFunction('addPurchase'), context);
   context.addPurchase();
-  return { product, purchases, cashEntries, messages };
+  return { product, purchases, cashEntries, messages, storage };
 }
 
 test('partial supplier purchase updates stock, weighted cost, payable and bank outflow', () => {
@@ -133,7 +135,7 @@ test('financial summary separates original mixed receipts, debt collections, ref
 });
 
 
-function returnHarness({ qty = 1, alreadyReturned = 0 } = {}) {
+function returnHarness({ qty = 1, alreadyReturned = 0, offline = false } = {}) {
   const fields = {
     returnInvoice: { value: '11' },
     returnItem: { value: '0' },
@@ -158,12 +160,14 @@ function returnHarness({ qty = 1, alreadyReturned = 0 } = {}) {
   const returns = [];
   const cashEntries = [];
   const messages = [];
+  const storage = new Map();
   const context = vm.createContext({
     Math, Number, String, Array, Set, Date,
     document: { getElementById: id => fields[id] || null },
+    navigator: { onLine: !offline },
     orders: [order], products: [product], customers: [customer],
     returns, cashEntries, warranties: [],
-    requireRole: () => true, save: () => true,
+    requireRole: () => true, save: () => { storage.set('es13_products', JSON.stringify([product])); storage.set('es13_orders', JSON.stringify([order])); storage.set('es13_customers', JSON.stringify([customer])); storage.set('es13_returns', JSON.stringify(returns)); storage.set('es13_cash', JSON.stringify(cashEntries)); return true; },
     toast: message => messages.push(message),
     renderReturns: () => {}, renderReports: () => {}, renderCash: () => {},
     renderStock: () => {}, renderProducts: () => {}, renderHomeProducts: () => {},
@@ -174,7 +178,7 @@ function returnHarness({ qty = 1, alreadyReturned = 0 } = {}) {
     blockFunction('recordReturn', 'saveSupplier')
   ].join('\n'), context);
   context.recordReturn();
-  return { item, order, product, customer, returns, cashEntries, messages };
+  return { item, order, product, customer, returns, cashEntries, messages, storage };
 }
 
 test('mixed-payment return restores stock, offsets debt and splits the cash refund proportionally', () => {
@@ -206,7 +210,7 @@ test('return exceeding the remaining item quantity is rejected without changing 
 });
 
 
-function checkoutHarness({ cash = 40, bank = 30, redeem = 20 } = {}) {
+function checkoutHarness({ cash = 40, bank = 30, redeem = 20, offline = false } = {}) {
   const fields = {
     saleSource: { value: 'central' }, saleDiscount: { value: '0' },
     payment: { value: 'مختلط / Mixte' }, saleCustomer: { value: '4' },
@@ -215,22 +219,52 @@ function checkoutHarness({ cash = 40, bank = 30, redeem = 20 } = {}) {
   };
   const product = { id: 3, name: 'Test item', price: 100, central: 5, van1: 0, van2: 0, costPrice: 50, costBasisVerified: true, warrantyMonths: 0, serials: [] };
   const customer = { id: 4, name: 'Test customer', phone: '', address: '', loyaltyPoints: 50 };
-  const cart = { 3: 1 }, orders = [], warranties = [], messages = [];
+  const cart = { 3: 1 }, orders = [], warranties = [], messages = [], storage = new Map();
   const context = vm.createContext({
     Math, Number, String, Array, Object, Date,
     document: { getElementById: id => fields[id] || null },
+    navigator: { onLine: !offline },
     products: [product], customers: [customer], cart, orders, warranties,
     sellerProfile: { company: 'ELECTRO Sandy' },
     currentUser: { id: 1, name: 'Tester', role: 'admin' },
-    requireRole: () => true, save: () => true,
+    requireRole: () => true, save: extra => { storage.set('es13_products', JSON.stringify([product])); storage.set('es13_orders', JSON.stringify(orders)); storage.set('es13_customers', JSON.stringify([customer])); storage.set('es13_warranties', JSON.stringify(extra?.[0]?.[1] || warranties)); return true; },
     addCalendarMonths: date => date,
     toggleSalePaymentFields: () => {}, renderCart: () => {}, renderSaleProducts: () => {},
     logActivity: () => {}, toast: message => messages.push(message)
   });
   vm.runInContext(oneLineFunction('checkout'), context);
   context.checkout();
-  return { product, customer, orders, messages, context };
+  return { product, customer, orders, messages, context, storage };
 }
+
+
+test('offline sale is persisted locally and survives reload from saved storage', () => {
+  const { product, orders, storage } = checkoutHarness({ offline: true });
+  assert.equal(orders.length, 1);
+  assert.equal(product.central, 4);
+  assert.equal(JSON.parse(storage.get('es13_orders'))[0].total, 98);
+  assert.equal(JSON.parse(storage.get('es13_products'))[0].central, 4);
+  assert.equal(JSON.parse(storage.get('es13_customers'))[0].loyaltyPoints, 37);
+});
+
+test('offline purchase is persisted locally and survives reload from saved storage', () => {
+  const { product, purchases, storage } = purchaseHarness({ offline: true });
+  assert.equal(purchases.length, 1);
+  assert.equal(product.central, 5);
+  assert.equal(JSON.parse(storage.get('es13_purchases'))[0].balance, 30);
+  assert.equal(JSON.parse(storage.get('es13_products'))[0].central, 5);
+  assert.equal(JSON.parse(storage.get('es13_cash'))[0].amount, 30);
+});
+
+test('offline return is persisted locally and survives reload from saved storage', () => {
+  const { product, order, returns, storage } = returnHarness({ offline: true });
+  assert.equal(returns.length, 1);
+  assert.equal(product.central, 3);
+  assert.equal(JSON.parse(storage.get('es13_returns')).length, 1);
+  assert.equal(JSON.parse(storage.get('es13_orders'))[0].balance, 0);
+  assert.equal(JSON.parse(storage.get('es13_products'))[0].central, 3);
+  assert.equal(JSON.parse(storage.get('es13_cash')).length, 2);
+});
 
 test('mixed sale applies loyalty redemption and earns points only on the amount paid', () => {
   const { product, customer, orders } = checkoutHarness();
