@@ -780,19 +780,20 @@ function onCloudChunkReceived(category,index,count,data,requestId){if(!requestId
 function cloudClearDownloadBuffers(){cloudDownloadParts={};cloudDownloadExpected={};cloudDownloadRequestId='';cloudDownloadLocalRevision=0;cloudDownloadBusy=false;cloudDownloadUid='';cloudDownloadLocalUserId=null}
 function mergeCloudRestoredProducts(remoteProducts,localProducts){
  const merged=Array.isArray(remoteProducts)?remoteProducts.slice():[];
- const identity=product=>{
-  if(!product||typeof product!=='object'||Array.isArray(product))return '';
-  if(product.id!==undefined&&product.id!==null&&String(product.id)!=='')return 'id:'+String(product.id);
-  if(product.barcode!==undefined&&product.barcode!==null&&String(product.barcode).trim())return 'barcode:'+String(product.barcode).trim();
-  return '';
+ const identities=product=>{
+  if(!product||typeof product!=='object'||Array.isArray(product))return [];
+  const keys=[];
+  if(product.id!==undefined&&product.id!==null&&String(product.id).trim())keys.push('id:'+String(product.id).trim());
+  if(product.barcode!==undefined&&product.barcode!==null&&String(product.barcode).trim())keys.push('barcode:'+String(product.barcode).trim());
+  return keys;
  };
- const known=new Set(merged.map(identity).filter(Boolean));
+ const known=new Set(merged.flatMap(identities));
  (Array.isArray(localProducts)?localProducts:[]).forEach(product=>{
   if(!product||typeof product!=='object'||Array.isArray(product))return;
-  const key=identity(product);
-  if(key&&known.has(key))return;
+  const keys=identities(product);
+  if(keys.some(key=>known.has(key)))return;
   merged.push(product);
-  if(key)known.add(key);
+  keys.forEach(key=>known.add(key));
  });
  return merged;
 }
