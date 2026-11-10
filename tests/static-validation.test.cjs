@@ -124,9 +124,11 @@ test('barcode scan launches the Android camera bridge and remembers its target',
   const start = html.match(/function startBarcodeScan\(target\)\{[^\n]+/);
   assert.ok(start, 'startBarcodeScan handler is missing');
   let scans = 0;
+  const scanner = { scanBarcode() { scans++; } };
   const context = {
     requireRole: () => true,
-    window: { AndroidScanner: { scanBarcode() { scans++; } } },
+    window: { AndroidScanner: scanner },
+    AndroidScanner: scanner,
     toast() {}
   };
   vm.runInNewContext(start[0], context);
