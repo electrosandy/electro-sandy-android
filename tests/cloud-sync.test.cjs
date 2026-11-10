@@ -121,3 +121,25 @@ test('cloud restore preserves products created locally after the last cloud snap
     'the cloud version remains authoritative for products present in both snapshots');
   assert.equal(merged.filter(p => p.id === 3).length, 1);
 });
+
+
+test('cloud restore deduplicates products when one copy has an ID and the other only a barcode', () => {
+  const match = html.match(/function mergeCloudRestoredProducts\([\\s\\S]*?\\n\\}/);
+  assert.ok(match, 'local/cloud product merge helper is missing');
+  const merge = vm.runInNewContext('(' + match[0] + ')');
+  const remote = [
+    { id: 41, barcode: 'MATCH-41', name: 'Cloud authoritative product' },
+    { barcode: 'REMOTE-ONLY', name: 'Remote barcode product' }
+  ];
+  const local = [
+    { barcode: 'MATCH-41', name: 'Same product without local ID' },
+    { id: 42, barcode: 'LOCAL-42', name: 'Local-only product' },
+    { id: 43, barcode: 'REMOTE-ONLY', name: 'Duplicate remote barcode product' }
+  ];
+  const merged = merge(remote, local);
+  assert.deepEqual(Array.from(merged, p => p.name), [
+    'Cloud authoritative product',
+    'Remote barcode product',
+    'Local-only product'
+  ]);
+});
