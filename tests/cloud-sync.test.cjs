@@ -61,7 +61,8 @@ test('snapshot commit verifies all twelve categories and chunk integrity before 
   assert.match(commit, /expectedBase\.equals\(currentId\)/);
   assert.match(commit, /transaction\.set\(snapshotRef, snapshotInfo\)/);
   assert.match(commit, /transaction\.set\(pointerRef, pointer\)/);
-  assert.ok(commit.indexOf('indexes.size() != count') < commit.indexOf('pointerRef'), 'current pointer is touched before chunk verification');
+  assert.ok(commit.indexOf('verifiedChunks.size() != count') < commit.indexOf('pointerRef'), 'current pointer is touched before chunk verification');
+  assert.ok(commit.indexOf('isValidCloudCategoryPayload(category,categoryPayload.toString())') < commit.indexOf('pointerRef'), 'current pointer is touched before JSON payload validation');
   assert.ok(commit.indexOf('transaction.set(snapshotRef, snapshotInfo)') < commit.indexOf('transaction.set(pointerRef, pointer)'),
     'snapshot and pointer must be published in the same transaction');
   assert.doesNotMatch(commit, /snapshotRef\.set\(/, 'snapshot must not be published before base-version validation');
