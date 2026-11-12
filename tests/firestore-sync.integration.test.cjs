@@ -52,7 +52,14 @@ async function validateSnapshot(db, id) {
       const value = chunk.data();
       if (value.index !== index || typeof value.data !== 'string' ||
           Buffer.byteLength(value.data, 'utf8') > 100000) return false;
-      try { JSON.parse(value.data); } catch { return false; }
+      let parsed;
+      try { parsed = JSON.parse(value.data); } catch { return false; }
+      if (category === 'sellerProfile') {
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+      } else {
+        if (!Array.isArray(parsed) || parsed.some(item =>
+          !item || typeof item !== 'object' || Array.isArray(item))) return false;
+      }
     }
   }
   return true;
@@ -98,7 +105,12 @@ async function downloadSnapshot(db) {
 }
 
 function allRecords(overrides = {}) {
-  return Object.fromEntries(categories.map(category => [category, overrides[category] || []]));
+  return Object.fromEntries(categories.map(category => [
+    category,
+    Object.prototype.hasOwnProperty.call(overrides, category)
+      ? overrides[category]
+      : category === 'sellerProfile' ? {} : []
+  ]));
 }
 
 async function seedSnapshot(id, records) {
@@ -209,6 +221,32 @@ test('offline sale, purchase and return records synchronize after reconnection t
   assert.deepEqual(received.returns, offlineBusinessData.returns);
   assert.deepEqual(received.cashEntries, offlineBusinessData.cashEntries);
   assert.deepEqual(received.products, offlineBusinessData.products);
+});
+
+test('wrong JSON category shapes and non-object records are rejected before publication', async () => {
+  const db = env.authenticatedContext(uid).firestore();
+  await seedSnapshot('base-1', allRecords());
+
+  await uploadSnapshot(db, 'wrong-products-shape', allRecords({
+    products: { id: 'not-an-array' }
+  }));
+  assert.equal(await commitSnapshot(db, 'wrong-products-shape', 'base-1'), false);
+
+  await uploadSnapshot(db, 'wrong-profile-shape', allRecords({
+    sellerProfile: []
+  }));
+  assert.equal(await commitSnapshot(db, 'wrong-profile-shape', 'base-1'), false);
+
+  await uploadSnapshot(db, 'primitive-record', allRecords({
+    returns: [{ id: 'valid' }, 'not-an-object']
+  }));
+  assert.equal(await commitSnapshot(db, 'primitive-record', 'base-1'), false);
+
+  const pointer = await getDoc(ref(db, pointerPath()));
+  assert.equal(pointer.data().snapshotId, 'base-1');
+  for (const id of ['wrong-products-shape', 'wrong-profile-shape', 'primitive-record']) {
+    assert.equal((await getDoc(ref(db, snapshotPath(id)))).exists(), false);
+  }
 });
 
 test('incomplete or malformed snapshots are never published as the current pointer', async () => {
