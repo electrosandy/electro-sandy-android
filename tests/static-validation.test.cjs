@@ -316,7 +316,7 @@ test('printed invoices include seller, customer, item, discount, returns, paid a
 });
 
 test('printed period report rejects missing, invalid and reversed dates before generating output', () => {
-  const report = extractTestFunction('printPeriodReport');
+  const reportMatch = html.match(/function printPeriodReport\\(\\)\\{[\\s\\S]*?\\n\\}/);\n  assert.ok(reportMatch, 'printPeriodReport handler is missing');\n  const report = reportMatch[0];
   const run = (from, to) => {
     const messages = [];
     let printCalls = 0;
@@ -338,7 +338,7 @@ test('printed period report rejects missing, invalid and reversed dates before g
 });
 
 test('printed period report accepts a valid date range and handles empty results', () => {
-  const report = extractTestFunction('printPeriodReport');
+  const reportMatch = html.match(/function printPeriodReport\\(\\)\\{[\\s\\S]*?\\n\\}/);\n  assert.ok(reportMatch, 'printPeriodReport handler is missing');\n  const report = reportMatch[0];
   const fields = { reportFrom: { value: '2026-11-01' }, reportTo: { value: '2026-11-12' } };
   let printed = null;
   const context = {
