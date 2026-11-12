@@ -13,7 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,7 +28,27 @@ jobs:
         run: |
           node --test tests/cash-accounting.test.cjs tests/financial-regression.test.cjs tests/static-validation.test.cjs tests/cloud-sync.test.cjs
 
-      - name: Set up JDK 17
+      - name: Set up Node.js for Firestore rules tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Java for Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install pinned Firestore test tools
+        run: |
+          npm install --no-save --no-package-lock firebase@11.10.0 @firebase/rules-unit-testing@4.0.1
+          npm install --global firebase-tools@14.12.0
+
+      - name: Test Firestore security rules in emulator
+        run: |
+          firebase emulators:exec --only firestore --project demo-electro-sandy "node --test tests/firestore-rules.test.cjs"
+
+      - name: Set up JDK 17 for Android build
         uses: actions/setup-java@v4
         with:
           distribution: temurin
