@@ -157,6 +157,7 @@ test('backup restore imports product photos and all core datasets', () => {
   const photo = 'data:image/jpeg;base64,restored';
   const arrays = html.match(/function validBackupArrays\(data,required\)\{[^\n]+/);
   const validateArrays = vm.runInNewContext('(' + arrays[0] + ')');
+  const messages = [];
   const backup = {
     products: [{ id: 9, image: photo, images: [photo] }],
     orders: [{ id: 8 }], customers: [{ id: 7 }], purchases: [{ id: 6 }],
@@ -173,7 +174,7 @@ test('backup restore imports product photos and all core datasets', () => {
     document: { getElementById: () => ({ value: '' }) },
     FileReader: class { readAsText() { this.result = JSON.stringify({ data: backup }); this.onload(); } },
     localStorage: storage, confirm: () => true,
-    savePreRestoreSafetyBackup: () => true, toast() {},
+    savePreRestoreSafetyBackup: () => true, toast: message => messages.push(message),
     currentUser: { id: 1 }, cart: {},
     products: [], orders: [], customers: [], purchases: [], cashEntries: [],
     cashClosings: [], stockAudits: [], activityLog: [], warranties: [],
@@ -186,6 +187,7 @@ test('backup restore imports product photos and all core datasets', () => {
   };
   vm.runInNewContext(html.slice(start, end), context);
   context.importBackup({ size: 10 });
+  assert.ok(storage.values.es13_products, 'restore did not write product data: ' + messages.join(' | '));
   assert.equal(JSON.parse(storage.values.es13_products)[0].images[0], photo);
   assert.deepEqual(JSON.parse(storage.values.es13_orders), backup.orders);
   assert.deepEqual(JSON.parse(storage.values.es13_customers), backup.customers);
