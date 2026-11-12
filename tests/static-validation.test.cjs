@@ -244,11 +244,12 @@ test('startup does not parse localStorage JSON without the safe reader', () => {
   assert.match(html, /readStoredJSON\('es13_products',\[\]\)/);
 });
 
-test('product image picker previews selected photos and accepts Android providers with empty MIME types', () => {
+test('product image picker previews selected photos through blob URLs and accepts Android providers with empty MIME types', () => {
   assert.match(html, /onchange="previewNewProductImages\(this\)"/);
   assert.match(html, /function previewNewProductImages\(input\)/);
+  assert.match(html, /URL\.createObjectURL\(file\)/);
   assert.match(html, /file\.type&&!String\(file\.type\)\.toLowerCase\(\)\.startsWith\('image\/'\)/);
-  assert.match(html, /تعذرت قراءة ملف الصورة/);
+  assert.match(html, /تعذر عرض الصورة المختارة/);
   assert.match(html, /صيغة الصورة غير مدعومة على هذا الجهاز/);
 });
 
@@ -286,14 +287,6 @@ test('checkout and live cart totals use the same normalized loyalty points parse
 
 function createImageCompressionHarness(options = {}) {
   const state = { canvasWidth: null, canvasHeight: null, quality: null, mime: null, drawArgs: null };
-  class FakeFileReader {
-    readAsDataURL() {
-      if (options.readThrows) throw new Error('read failed');
-      if (options.readerError) return this.onerror(new Error('read failed'));
-      this.result = options.readerResult ?? 'data:image/png;base64,source-image';
-      this.onload();
-    }
-  }
   class FakeImage {
     constructor() {
       this.width = options.imageWidth ?? 1800;
@@ -325,13 +318,20 @@ function createImageCompressionHarness(options = {}) {
       };
     }
   };
-  const context = { FileReader: FakeFileReader, Image: FakeImage, document, console: { info() {} } };
-  const fn = html.match(/function compressProductImage\(file,done,fail\)\{[^\n]+/);
+  const URL = {
+    createObjectURL() {
+      if (options.urlError) throw new Error('blob access denied');
+      return 'blob:fake-image';
+    },
+    revokeObjectURL() {}
+  };
+  const context = { URL, Image: FakeImage, document, console: { info() {} } };
+  const fn = html.match(/function compressProductImage\(file,done,fail\)\{[^\\n]+/);
   assert.ok(fn, 'compressProductImage handler is missing');
   vm.runInNewContext(fn[0], context);
   return {
     state,
-    compress(file = { size: 2048 }) {
+    compress(file = { size: 2048, type: options.fileType ?? 'image/jpeg' }) {
       return new Promise((resolve, reject) => context.compressProductImage(file, resolve, reject));
     }
   };
@@ -358,9 +358,9 @@ test('product image compression preserves small image dimensions without upscali
   assert.equal(harness.state.canvasHeight, 300);
 });
 
-test('product image compression rejects unreadable and non-image files', async () => {
-  await assert.rejects(createImageCompressionHarness({ readerError: true }).compress(), /تعذرت قراءة ملف الصورة/);
-  await assert.rejects(createImageCompressionHarness({ readerResult: 'not-an-image' }).compress(), /الملف المختار ليس صورة قابلة للقراءة/);
+test('product image compression rejects inaccessible, non-image and unreadable files', async () => {
+  await assert.rejects(createImageCompressionHarness({ urlError: true }).compress(), /تعذر فتح ملف الصورة من الهاتف/);
+  await assert.rejects(createImageCompressionHarness({ fileType: 'text/plain' }).compress(), /الملف المختار ليس صورة قابلة للقراءة/);
   await assert.rejects(createImageCompressionHarness({ imageError: true }).compress(), /صيغة الصورة غير مدعومة على هذا الجهاز/);
 });
 
