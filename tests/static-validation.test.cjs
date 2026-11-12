@@ -88,6 +88,108 @@ test('exported backup preserves all business datasets and product photo payloads
   assert.deepEqual(exported.data.data.sellerProfile, context.sellerProfile);
 });
 
+test('backup restore rolls back every stored key when one write fails', () => {
+  const start = html.indexOf('function importBackup(file)');
+  const end = html.indexOf('\nfunction restoreAutoBackup()', start);
+  assert.ok(start >= 0 && end > start, 'importBackup handler is missing');
+  const source = html.slice(start, end);
+  const original = {
+    es13_products: '[{"id":1}]',
+    es13_orders: '[]',
+    es13_customers: '[]',
+    es13_purchases: '[]',
+    es13_cash: '[]',
+    es13_cash_closings: '[]',
+    es13_stock_audits: '[]',
+    es13_activity_log: '[]',
+    es13_warranties: '[]',
+    es13_users: '[]',
+    es13_suppliers: '[]',
+    es13_returns: '[]',
+    es13_seller_profile: '{}'
+  };
+  const storage = {
+    values: { ...original },
+    failed: false,
+    getItem(key) { return this.values[key] ?? null; },
+    setItem(key, value) {
+      if (key === 'es13_returns' && !this.failed) { this.failed = true; throw new Error('quota'); }
+      this.values[key] = value;
+    },
+    removeItem(key) { delete this.values[key]; }
+  };
+  const backup = {
+    products: [{ id: 2, images: ['data:image/jpeg;base64,photo'] }],
+    orders: [], customers: [], purchases: [], cashEntries: [], sellerProfile: { company: 'ELECTRO Sandy' }
+  };
+  const messages = [];
+  const context = {
+    requireRole: () => true,
+    document: { getElementById: () => ({ value: '' }) },
+    FileReader: class { readAsText() { this.result = JSON.stringify({ data: backup }); this.onload(); } },
+    localStorage: storage,
+    confirm: () => true,
+    savePreRestoreSafetyBackup: () => true,
+    toast: message => messages.push(message),
+    currentUser: { id: 1 }, cart: {},
+    products: [{ id: 1 }], orders: [], customers: [], purchases: [], cashEntries: [],
+    cashClosings: [], stockAudits: [], activityLog: [], warranties: [], appUsers: [],
+    suppliers: [], returns: [], sellerProfile: {},
+    renderLogin() {}, renderSaleProducts() {}, renderCart() {}, renderProducts() {},
+    renderHomeProducts() {}, renderStock() {}, renderTransfer() {}, renderStockAudit() {},
+    renderCustomerSelect() {}, renderCustomers() {}, renderReports() {}, renderWarranties() {},
+    renderUserAdmin() {}, renderSuppliers() {}, renderReturns() {}, renderPurchases() {},
+    renderCash() {}, refresh() {}
+  };
+  vm.runInNewContext(source, context);
+  context.importBackup({ size: 10 });
+  assert.deepEqual(storage.values, original, 'all previous localStorage values must be restored');
+  assert.ok(messages.some(message => message.includes('مساحة التخزين')));
+});
+
+test('backup restore imports product photos and all core datasets', () => {
+  const start = html.indexOf('function importBackup(file)');
+  const end = html.indexOf('\nfunction restoreAutoBackup()', start);
+  assert.ok(start >= 0 && end > start, 'importBackup handler is missing');
+  const photo = 'data:image/jpeg;base64,restored';
+  const backup = {
+    products: [{ id: 9, image: photo, images: [photo] }],
+    orders: [{ id: 8 }], customers: [{ id: 7 }], purchases: [{ id: 6 }],
+    cashEntries: [{ id: 5 }], sellerProfile: { company: 'ELECTRO Sandy' }
+  };
+  const storage = {
+    values: {},
+    getItem(key) { return this.values[key] ?? null; },
+    setItem(key, value) { this.values[key] = value; },
+    removeItem(key) { delete this.values[key]; }
+  };
+  const context = {
+    requireRole: () => true,
+    document: { getElementById: () => ({ value: '' }) },
+    FileReader: class { readAsText() { this.result = JSON.stringify({ data: backup }); this.onload(); } },
+    localStorage: storage, confirm: () => true,
+    savePreRestoreSafetyBackup: () => true, toast() {},
+    currentUser: { id: 1 }, cart: {},
+    products: [], orders: [], customers: [], purchases: [], cashEntries: [],
+    cashClosings: [], stockAudits: [], activityLog: [], warranties: [],
+    appUsers: [{ id: 1, active: true }], suppliers: [], returns: [], sellerProfile: {},
+    renderLogin() {}, renderSaleProducts() {}, renderCart() {}, renderProducts() {},
+    renderHomeProducts() {}, renderStock() {}, renderTransfer() {}, renderStockAudit() {},
+    renderCustomerSelect() {}, renderCustomers() {}, renderReports() {}, renderWarranties() {},
+    renderUserAdmin() {}, renderSuppliers() {}, renderReturns() {}, renderPurchases() {},
+    renderCash() {}, refresh() {}
+  };
+  vm.runInNewContext(html.slice(start, end), context);
+  context.importBackup({ size: 10 });
+  assert.equal(JSON.parse(storage.values.es13_products)[0].images[0], photo);
+  assert.deepEqual(JSON.parse(storage.values.es13_orders), backup.orders);
+  assert.deepEqual(JSON.parse(storage.values.es13_customers), backup.customers);
+  assert.deepEqual(JSON.parse(storage.values.es13_purchases), backup.purchases);
+  assert.deepEqual(JSON.parse(storage.values.es13_cash), backup.cashEntries);
+  assert.equal(JSON.parse(storage.values.es13_seller_profile).company, 'ELECTRO Sandy');
+  assert.equal(context.products[0].images[0], photo);
+});
+
 test('product photo picker supports up to three images', () => {
   assert.match(html, /id="newImageFile"[^>]*multiple/);
   assert.match(html, /baseImages\.length\+files\.length>3/);
