@@ -335,6 +335,7 @@ test('automatic lock clears the active session and opens the PIN login gate afte
   let timerId = 0, timerCallback = null, cleared = [];
   const storage = new Map([['es13_auto_lock_minutes', '1']]);
   const authGate = { style: {} };
+  let loginRendered = false;
   const context = {
     currentUser: { id: 9, name: 'Admin' }, inactivityTimer: null,
     localStorage: {
@@ -344,7 +345,7 @@ test('automatic lock clears the active session and opens the PIN login gate afte
     Date: { now: () => 1000 },
     setTimeout: callback => { timerCallback = callback; return ++timerId; },
     clearTimeout: id => cleared.push(id),
-    renderLogin() { this.loginRendered = true; },
+    renderLogin() { loginRendered = true; },
     document: { getElementById: id => id === 'authGate' ? authGate : null },
     toast(message) { this.lastToast = message; }
   };
@@ -355,7 +356,7 @@ test('automatic lock clears the active session and opens the PIN login gate afte
   timerCallback();
   assert.equal(context.currentUser, null);
   assert.equal(storage.get('es13_last_user_id'), '9');
-  assert.equal(context.loginRendered, true);
+  assert.equal(loginRendered, true);
   assert.equal(authGate.style.display, 'flex');
   assert.match(context.lastToast, /قفل التطبيق/);
   assert.deepEqual(cleared, [null, 1]);
@@ -388,7 +389,7 @@ test('biometric login is enabled only after native authentication succeeds', () 
   context.toggleBiometricLogin();
   context.onBiometricError('cancelled');
   assert.equal(storage.has('es13_biometric_enabled'), false);
-  assert.equal(context.biometricSetupPending, false);
+  assert.equal(vm.runInNewContext('biometricSetupPending', context), false);
   assert.equal(context.lastToast, 'cancelled');
 });
 
