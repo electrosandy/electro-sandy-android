@@ -316,9 +316,10 @@ test('printed invoices include seller, customer, item, discount, returns, paid a
 });
 
 test('printed period report rejects missing, invalid and reversed dates before generating output', () => {
-  const reportMatch = html.match(/function printPeriodReport\(\)\{[\s\S]*?\n\}/);
-  assert.ok(reportMatch, 'printPeriodReport handler is missing');
-  const report = reportMatch[0];
+  const reportStart = html.indexOf('function printPeriodReport(){');
+  const reportEnd = html.indexOf('function financialSummary', reportStart);
+  assert.ok(reportStart >= 0 && reportEnd > reportStart, 'printPeriodReport handler is missing');
+  const report = html.slice(reportStart, reportEnd).trim();
   const run = (from, to) => {
     const messages = [];
     let printCalls = 0;
