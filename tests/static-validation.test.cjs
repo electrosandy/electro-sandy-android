@@ -326,7 +326,7 @@ function createImageCompressionHarness(options = {}) {
     revokeObjectURL() {}
   };
   const context = { URL, Image: FakeImage, document, console: { info() {} } };
-  const fn = html.match(/function compressProductImage\(file,done,fail\)\{[^\\n]+/);
+  const fn = html.match(/function compressProductImage\(file,done,fail\)\{[^\n]+/);
   assert.ok(fn, 'compressProductImage handler is missing');
   vm.runInNewContext(fn[0], context);
   return {
