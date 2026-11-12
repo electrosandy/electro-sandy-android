@@ -220,6 +220,15 @@ test('incomplete or malformed snapshots are never published as the current point
     chunkCount: 2, updatedAt: now
   });
   assert.equal(await commitSnapshot(db, 'broken-2', 'base-1'), false);
+  assert.equal((await getDoc(ref(db, snapshotPath('broken-2')))).exists(), false);
+
+  await uploadSnapshot(db, 'malformed-3', allRecords());
+  await setDoc(ref(db, `${snapshotPath('malformed-3')}/data/returns/chunks/000000`), {
+    index: 0, data: '{not-valid-json', updatedAt: now
+  });
+  assert.equal(await commitSnapshot(db, 'malformed-3', 'base-1'), false);
+  assert.equal((await getDoc(ref(db, snapshotPath('malformed-3')))).exists(), false);
+
   const pointer = await getDoc(ref(db, pointerPath()));
   assert.equal(pointer.data().snapshotId, 'base-1');
 });
