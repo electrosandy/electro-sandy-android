@@ -414,7 +414,7 @@ test('successful biometric login restores only the last active saved user', () =
   const context = {
     currentUser: null, appUsers: [user],
     window: { AndroidBiometric: biometric, AndroidShare: { cloudCheckAuth() {} } },
-    AndroidBiometric: biometric,
+    AndroidBiometric: biometric, AndroidShare: { cloudCheckAuth() {} },
     localStorage: {
       getItem: key => storage.has(key) ? storage.get(key) : null,
       setItem: (key, value) => storage.set(key, String(value)),
