@@ -499,6 +499,10 @@ public class MainActivity extends FragmentActivity {
         if (android.os.Build.VERSION.SDK_INT >= 26) webView.getSettings().setSafeBrowsingEnabled(true);
         webView.getSettings().setGeolocationEnabled(false);
         webView.getSettings().setDomStorageEnabled(true);
+        // Force software composition for the app WebView. Some headless Android
+        // emulator GPU stacks report a ready DOM while presenting a white surface.
+        webView.setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null);
+        webView.setBackgroundColor(android.graphics.Color.rgb(9, 19, 33));
         webView.getSettings().setAllowFileAccess(true);
         webView.getSettings().setAllowContentAccess(true);
         webView.getSettings().setAllowFileAccessFromFileURLs(false);
