@@ -328,3 +328,77 @@ test('native invoice printing bridge delegates HTML to Android PrintManager', ()
   assert.deepEqual(received, { source: '<html>invoice</html>', title: 'Invoice 1' });
 });
 
+test('automatic lock clears the active session and opens the PIN login gate after inactivity', () => {
+  const lock = html.match(/function lockApp\(\)\{[^\n]+/);
+  const arm = html.match(/function armAutoLock\(\)\{[^\n]+/);
+  assert.ok(lock && arm, 'auto-lock handlers are missing');
+  let timerId = 0, timerCallback = null, cleared = [];
+  const storage = new Map([['es13_auto_lock_minutes', '1']]);
+  const context = {
+    currentUser: { id: 9, name: 'Admin' }, inactivityTimer: null,
+    localStorage: {
+      getItem: key => storage.has(key) ? storage.get(key) : null,
+      setItem: (key, value) => storage.set(key, String(value))
+    },
+    Date: { now: () => 1000 },
+    setTimeout: callback => { timerCallback = callback; return ++timerId; },
+    clearTimeout: id => cleared.push(id),
+    renderLogin() { this.loginRendered = true; },
+    document: { getElementById: id => id === 'authGate' ? { style: {} } : null },
+    toast(message) { this.lastToast = message; }
+  };
+  vm.runInNewContext('let inactivityTimer=null,lastActivityAt=Date.now();' + lock[0] + arm[0], context);
+  context.armAutoLock();
+  assert.equal(timerId, 1);
+  assert.equal(typeof timerCallback, 'function');
+  timerCallback();
+  assert.equal(context.currentUser, null);
+  assert.equal(storage.get('es13_last_user_id'), '9');
+  assert.equal(context.loginRendered, true);
+  assert.equal(context.document.getElementById('authGate').style.display, 'flex');
+  assert.match(context.lastToast, /قفل التطبيق/);
+  assert.deepEqual(cleared, [null, 1]);
+});
+
+test('biometric login is enabled only after native authentication succeeds', () => {
+  const match = html.match(/let biometricSetupPending=false;function toggleBiometricLogin\(\)[^\n]+/);
+  assert.ok(match, 'biometric handlers are missing');
+  const storage = new Map();
+  let nativeCalls = 0;
+  const biometric = { authenticateBiometric() { nativeCalls++; } };
+  const context = {
+    window: { AndroidBiometric: biometric }, AndroidBiometric: biometric,
+    localStorage: {
+      getItem: key => storage.has(key) ? storage.get(key) : null,
+      setItem: (key, value) => storage.set(key, String(value)),
+      removeItem: key => storage.delete(key)
+    },
+    requireRole: role => role === 'admin',
+    toast(message) { this.lastToast = message; }
+  };
+  vm.runInNewContext(match[0], context);
+  context.toggleBiometricLogin();
+  assert.equal(nativeCalls, 1);
+  assert.equal(storage.has('es13_biometric_enabled'), false);
+  context.onBiometricAuthenticated();
+  assert.equal(storage.get('es13_biometric_enabled'), '1');
+  context.toggleBiometricLogin();
+  assert.equal(storage.has('es13_biometric_enabled'), false);
+  context.toggleBiometricLogin();
+  context.onBiometricError('cancelled');
+  assert.equal(storage.has('es13_biometric_enabled'), false);
+  assert.equal(context.biometricSetupPending, false);
+  assert.equal(context.lastToast, 'cancelled');
+});
+
+test('Android native bridge routes biometric success and failure and uses Android PrintManager', () => {
+  const javaPath = path.join(__dirname, '..', 'app', 'src', 'main', 'java', 'com', 'electrosandy', 'app', 'MainActivity.java');
+  const java = fs.readFileSync(javaPath, 'utf8');
+  assert.match(java, /@JavascriptInterface\s+public void authenticateBiometric\(\)/);
+  assert.match(java, /window\.onBiometricAuthenticated\(\)/);
+  assert.match(java, /window\.onBiometricError\(/);
+  assert.match(java, /new BiometricPrompt\(main, ContextCompat\.getMainExecutor\(main\)/);
+  assert.match(java, /manager\.print\(/);
+  assert.match(java, /createPrintDocumentAdapter\(jobName/);
+});
+
