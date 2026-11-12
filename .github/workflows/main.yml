@@ -48,6 +48,10 @@ jobs:
         run: |
           firebase emulators:exec --only firestore --project demo-electro-sandy "node --test tests/firestore-rules.test.cjs"
 
+      - name: Test two-client cloud sync integration in emulator
+        run: |
+          firebase emulators:exec --only firestore --project demo-electro-sandy-sync "node --test tests/firestore-sync.integration.test.cjs"
+
       - name: Set up JDK 17 for Android build
         uses: actions/setup-java@v4
         with:
