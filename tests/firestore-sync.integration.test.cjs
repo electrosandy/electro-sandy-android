@@ -77,6 +77,26 @@ async function commitSnapshot(db, id, expectedBaseId) {
   });
 }
 
+async function downloadSnapshot(db) {
+  const pointer = await getDoc(ref(db, pointerPath()));
+  assert.equal(pointer.exists(), true, 'a current snapshot pointer must exist');
+  const id = pointer.data().snapshotId;
+  const result = {};
+  for (const category of categories) {
+    const meta = await getDoc(ref(db, `${snapshotPath(id)}/meta/${category}`));
+    assert.equal(meta.exists(), true, `missing metadata for ${category}`);
+    const chunks = [];
+    for (let index = 0; index < meta.data().chunkCount; index++) {
+      const chunk = await getDoc(ref(db,
+        `${snapshotPath(id)}/data/${category}/chunks/${String(index).padStart(6, '0')}`));
+      assert.equal(chunk.exists(), true, `missing chunk for ${category}`);
+      chunks.push(chunk.data().data);
+    }
+    result[category] = JSON.parse(chunks.join(''));
+  }
+  return result;
+}
+
 function allRecords(overrides = {}) {
   return Object.fromEntries(categories.map(category => [category, overrides[category] || []]));
 }
@@ -161,6 +181,34 @@ test('a committed full snapshot carries deletions to the other client without re
   assert.deepEqual(restoredProducts.map(item => item.id), ['keep']);
   assert.equal(restoredProducts.some(item => item.id === 'delete-me'), false,
     'a record removed in the new full snapshot must not reappear on the receiving client');
+});
+
+test('offline sale, purchase and return records synchronize after reconnection to the second client', async () => {
+  const deviceA = env.authenticatedContext(uid).firestore();
+  const deviceB = env.authenticatedContext(uid).firestore();
+  await seedSnapshot('base-1', allRecords());
+
+  // These are the complete local business records accumulated while device A was offline.
+  const offlineBusinessData = allRecords({
+    products: [{ id: 'p1', central: 7 }],
+    orders: [{ id: 'sale-1', productId: 'p1', quantity: 2, total: 200, paidAmount: 200 }],
+    purchases: [{ id: 'purchase-1', productId: 'p1', quantity: 5, total: 350 }],
+    returns: [{ id: 'return-1', orderId: 'sale-1', productId: 'p1', quantity: 1, refund: 100 }],
+    cashEntries: [
+      { id: 'cash-sale', type: 'in', amount: 200 },
+      { id: 'cash-refund', type: 'out', amount: 100 }
+    ]
+  });
+
+  await uploadSnapshot(deviceA, 'reconnected-1', offlineBusinessData);
+  assert.equal(await commitSnapshot(deviceA, 'reconnected-1', 'base-1'), true);
+
+  const received = await downloadSnapshot(deviceB);
+  assert.deepEqual(received.orders, offlineBusinessData.orders);
+  assert.deepEqual(received.purchases, offlineBusinessData.purchases);
+  assert.deepEqual(received.returns, offlineBusinessData.returns);
+  assert.deepEqual(received.cashEntries, offlineBusinessData.cashEntries);
+  assert.deepEqual(received.products, offlineBusinessData.products);
 });
 
 test('incomplete or malformed snapshots are never published as the current pointer', async () => {
