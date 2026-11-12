@@ -2,7 +2,7 @@ name: Android Emulator Smoke Test
 
 on:
   push:
-    branches: [main, master, release-candidate-v30]
+    branches: [main, master, release-candidate-v30, fix/cloud-sync-storage-deletions-main]
   pull_request:
     branches: [main, master]
   workflow_dispatch:
