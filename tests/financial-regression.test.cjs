@@ -249,7 +249,7 @@ function reloadStoredApplication(storage) {
   const end = html.indexOf('function logActivity(', start);
   assert.ok(start >= 0 && end > start, 'Could not locate the application storage initialization block');
   vm.runInContext(oneLineFunction('readStoredJSON') + '\n' + html.slice(start, end), context);
-  return context;
+  return vm.runInContext('({products, orders, customers, purchases, cashEntries, returns})', context);
 }
 
 test('offline sale is restored by application initialization from local storage', () => {
