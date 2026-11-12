@@ -386,6 +386,48 @@ test('printed period report accepts a valid date range and handles empty results
   assert.match(printed.html, /لا توجد مرتجعات/);
 });
 
+test('printed warranty report escapes stored text and explains an empty register', () => {
+  const match = html.match(/function printWarranties\(\)\{[^\n]+/);
+  assert.ok(match, 'printWarranties handler is missing');
+  const escape = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[ch]);
+  let printed = null;
+  const context = { warranties: [], statementEscape: escape, printHtmlDocument: source => { printed = source; } };
+  vm.runInNewContext(match[0], context);
+  context.printWarranties();
+  assert.ok(printed.includes('لا توجد سجلات ضمان'));
+  context.warranties = [{ productName: '<img src=x>', serial: 'SN-9', invoiceNo: 'INV-9', customer: '<script>x</script>', months: 12, expiresAt: 'invalid-date', status: 'active' }];
+  context.printWarranties();
+  assert.ok(printed.includes('&lt;img src=x&gt;'));
+  assert.ok(printed.includes('&lt;script&gt;x&lt;/script&gt;'));
+  assert.ok(printed.includes('SN-9'));
+  assert.ok(printed.includes('—'));
+  assert.equal(printed.includes('<script>x</script>'), false);
+});
+
+test('printed financial report includes discounts, returns, net, paid and remaining amounts safely', () => {
+  const match = html.match(/function printFinancialReport\(\)\{[^\n]+/);
+  assert.ok(match, 'printFinancialReport handler is missing');
+  const escape = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[ch]);
+  let printed = null;
+  const order = { invoiceNo: 'INV-10', date: '2026-11-12', customerInfo: { name: '<b>Client</b>' }, subtotal: 250, discountAmount: 25, returnedAmount: 20, total: 225, paidAmount: 150, balance: 75 };
+  const context = {
+    orders: [order], statementEscape: escape,
+    financialSummary: () => ({ sales: 205, cost: 100, grossProfit: 105, cashBalance: 150, bankBalance: 0, expenses: 10, profit: 95 }),
+    printHtmlDocument: source => { printed = source; }
+  };
+  vm.runInNewContext(match[0], context);
+  context.printFinancialReport();
+  for (const value of ['INV-10', '250.00', '25.00', '20.00', '225.00', '205.00', '150.00', '75.00']) {
+    assert.ok(printed.includes(value), 'financial report missing ' + value);
+  }
+  assert.ok(printed.includes('&lt;b&gt;Client&lt;/b&gt;'));
+  assert.equal(printed.includes('<b>Client</b>'), false);
+});
+
 test('native invoice printing bridge delegates HTML to Android PrintManager', () => {
   const match = html.match(/function printHtmlDocument\(html,title\)\{[^\n]+/);
   assert.ok(match, 'printHtmlDocument handler is missing');
