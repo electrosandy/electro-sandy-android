@@ -238,25 +238,49 @@ function checkoutHarness({ cash = 40, bank = 30, redeem = 20, offline = false } 
 }
 
 
-test('offline sale is persisted locally and survives reload from saved storage', () => {
+function reloadStoredApplication(storage) {
+  const context = vm.createContext({
+    Math, Number, String, Array, Set, Date, JSON,
+    localStorage: {
+      getItem: key => storage.has(key) ? storage.get(key) : null
+    }
+  });
+  const start = html.indexOf('let products=readStoredJSON(');
+  const end = html.indexOf('function logActivity(', start);
+  assert.ok(start >= 0 && end > start, 'Could not locate the application storage initialization block');
+  vm.runInContext(oneLineFunction('readStoredJSON') + '\n' + html.slice(start, end), context);
+  return context;
+}
+
+test('offline sale is restored by application initialization from local storage', () => {
   const { product, orders, storage } = checkoutHarness({ offline: true });
   assert.equal(orders.length, 1);
   assert.equal(product.central, 4);
   assert.equal(JSON.parse(storage.get('es13_orders'))[0].total, 98);
   assert.equal(JSON.parse(storage.get('es13_products'))[0].central, 4);
   assert.equal(JSON.parse(storage.get('es13_customers'))[0].loyaltyPoints, 37);
+  const reloaded = reloadStoredApplication(storage);
+  assert.equal(reloaded.products[0].central, 4);
+  assert.equal(reloaded.orders.length, 1);
+  assert.equal(reloaded.orders[0].total, 98);
+  assert.equal(reloaded.customers[0].loyaltyPoints, 37);
 });
 
-test('offline purchase is persisted locally and survives reload from saved storage', () => {
+test('offline purchase is restored by application initialization from local storage', () => {
   const { product, purchases, storage } = purchaseHarness({ offline: true });
   assert.equal(purchases.length, 1);
   assert.equal(product.central, 5);
   assert.equal(JSON.parse(storage.get('es13_purchases'))[0].balance, 30);
   assert.equal(JSON.parse(storage.get('es13_products'))[0].central, 5);
   assert.equal(JSON.parse(storage.get('es13_cash'))[0].amount, 30);
+  const reloaded = reloadStoredApplication(storage);
+  assert.equal(reloaded.products[0].central, 5);
+  assert.equal(reloaded.purchases.length, 1);
+  assert.equal(reloaded.purchases[0].balance, 30);
+  assert.equal(reloaded.cashEntries[0].amount, 30);
 });
 
-test('offline return is persisted locally and survives reload from saved storage', () => {
+test('offline return is restored by application initialization from local storage', () => {
   const { product, order, returns, storage } = returnHarness({ offline: true });
   assert.equal(returns.length, 1);
   assert.equal(product.central, 3);
@@ -264,6 +288,11 @@ test('offline return is persisted locally and survives reload from saved storage
   assert.equal(JSON.parse(storage.get('es13_orders'))[0].balance, 0);
   assert.equal(JSON.parse(storage.get('es13_products'))[0].central, 3);
   assert.equal(JSON.parse(storage.get('es13_cash')).length, 2);
+  const reloaded = reloadStoredApplication(storage);
+  assert.equal(reloaded.products[0].central, 3);
+  assert.equal(reloaded.returns.length, 1);
+  assert.equal(reloaded.orders[0].balance, 0);
+  assert.equal(reloaded.cashEntries.length, 2);
 });
 
 test('mixed sale applies loyalty redemption and earns points only on the amount paid', () => {

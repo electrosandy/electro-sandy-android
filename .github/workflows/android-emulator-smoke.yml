@@ -130,6 +130,8 @@ jobs:
           timeout 20s adb logcat -d -s ELECTRO_SMOKE:I > "$GITHUB_WORKSPACE/emulator-results/page-ready.txt"
           grep -q 'PAGE_FINISHED' "$GITHUB_WORKSPACE/emulator-results/page-ready.txt"
           grep -Eq 'bodyLength[^0-9]*[1-9][0-9]{1,}' "$GITHUB_WORKSPACE/emulator-results/page-ready.txt"
+          grep -q '"authGateDisplay":"flex"' "$GITHUB_WORKSPACE/emulator-results/page-ready.txt"
+          grep -Eq '"authContentLength":[1-9][0-9]+' "$GITHUB_WORKSPACE/emulator-results/page-ready.txt"
           timeout 20s adb shell pidof "$PACKAGE" > "$GITHUB_WORKSPACE/emulator-results/app-pid.txt"
           test -s "$GITHUB_WORKSPACE/emulator-results/app-pid.txt"
           timeout 20s adb shell dumpsys activity activities > "$GITHUB_WORKSPACE/emulator-results/activities.txt"
@@ -144,17 +146,20 @@ jobs:
             public static void main(String[] args) throws Exception {
               BufferedImage image = ImageIO.read(new File(args[0]));
               if (image == null) throw new IllegalStateException("Screenshot could not be decoded");
-              long colored = 0, sampled = 0;
-              for (int y = 0; y < image.getHeight(); y += 4) {
+              if (image.getWidth() < 100 || image.getHeight() < 300) throw new IllegalStateException("Screenshot dimensions are invalid");
+              long nonWhite = 0, sampled = 0;
+              int top = image.getHeight() / 20;
+              int bottom = image.getHeight() - image.getHeight() / 14;
+              for (int y = top; y < bottom; y += 4) {
                 for (int x = 0; x < image.getWidth(); x += 4) {
                   int rgb = image.getRGB(x, y) & 0x00ffffff;
                   sampled++;
-                  if (rgb < 0x00f5f5f5) colored++;
+                  if (rgb < 0x00f0f0f0) nonWhite++;
                 }
               }
-              double ratio = sampled == 0 ? 0 : (double) colored / sampled;
-              System.out.println("SCREEN_NONWHITE_RATIO=" + ratio);
-              if (ratio < 0.01) throw new IllegalStateException("App screen is blank or entirely white");
+              double ratio = sampled == 0 ? 0 : (double) nonWhite / sampled;
+              System.out.println("SCREEN_CONTENT_NONWHITE_RATIO=" + ratio);
+              if (ratio < 0.50) throw new IllegalStateException("WebView content area is blank/white; non-white pixel ratio=" + ratio);
             }
           }
           JAVA

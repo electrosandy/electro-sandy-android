@@ -512,7 +512,7 @@ public class MainActivity extends FragmentActivity {
             @Override public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 Log.i("ELECTRO_SMOKE", "PAGE_FINISHED url=" + url);
-                view.evaluateJavascript("(function(){var b=document.body;var t=document.title||'';var s=document.readyState;var n=b?(b.innerText||'').length:0;if(window.AndroidShare&&AndroidShare.reportPageReady)AndroidShare.reportPageReady(t,s,n);return JSON.stringify({title:t,readyState:s,bodyLength:n,bodyBackground:b?getComputedStyle(b).backgroundColor:''})})()", value ->
+                view.evaluateJavascript("(function(){var b=document.body,g=document.getElementById('authGate'),c=document.getElementById('authContent'),t=document.title||'',s=document.readyState,n=b?(b.innerText||'').length:0;if(window.AndroidShare&&AndroidShare.reportPageReady)AndroidShare.reportPageReady(t,s,n);return JSON.stringify({title:t,readyState:s,bodyLength:n,bodyBackground:b?getComputedStyle(b).backgroundColor:'',authGateDisplay:g?getComputedStyle(g).display:'missing',authContentLength:c?(c.innerText||'').trim().length:0,viewportWidth:window.innerWidth,viewportHeight:window.innerHeight})})()", value ->
                     Log.i("ELECTRO_SMOKE", "DOM_STATE " + value));
             }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
