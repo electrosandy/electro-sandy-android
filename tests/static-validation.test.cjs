@@ -279,3 +279,52 @@ test('multiple product images survive localStorage serialization and app restart
   assert.equal(restoredProducts[0].image, images[0]);
   assert.deepEqual(Array.from(listImages({ image: images[0] })), [images[0]]);
 });
+
+test('printed invoices include seller, customer, item, discount, returns, paid amount and remaining balance safely', () => {
+  const match = html.match(/function printInvoice\(id\)\{[\s\S]*?\n\}/);
+  assert.ok(match, 'printInvoice handler is missing');
+  let printed = null;
+  const escape = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[ch]);
+  const order = {
+    id: 7, invoiceNo: 'INV-007', date: '2026-11-12',
+    customerInfo: { name: '<img src=x onerror=1>', phone: '0600000000', address: 'Tangier' },
+    sellerInfo: { company: 'ELECTRO Sandy', name: 'Seller', phone: '0611111111', address: 'Morocco', ice: 'ICE-1' },
+    payment: 'نقداً وجزئياً', source: 'central',
+    items: [{ name: '<script>alert(1)</script>', qty: 2, unitPrice: 100, lineTotal: 200, serials: ['SN-1'], warrantyMonths: 12 }],
+    subtotal: 220, total: 200, discountAmount: 20, discountPercent: 9.09,
+    returnedAmount: 10, paidAmount: 125, balance: 75,
+    loyaltyPointsRedeemed: 0, loyaltyDiscountAmount: 0
+  };
+  const context = {
+    orders: [order], sellerProfile: {}, statementEscape: escape,
+    document: { body: { classList: { contains: () => false } } },
+    printHtmlDocument: (source, title) => { printed = { source, title }; }
+  };
+  vm.runInNewContext(match[0], context);
+  context.printInvoice(7);
+  assert.ok(printed, 'invoice HTML was not sent to the print handler');
+  for (const value of ['ELECTRO Sandy', 'INV-007', 'Seller', '0600000000', 'Tangier', 'SN-1', '220.00 DH', '20.00 DH', '10.00 DH', '125.00 DH', '75.00 DH', '190.00 DH']) {
+    assert.ok(printed.source.includes(value), 'printed invoice is missing: ' + value);
+  }
+  assert.ok(printed.source.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
+  assert.ok(printed.source.includes('&lt;img src=x onerror=1&gt;'));
+  assert.equal(printed.source.includes('<script>alert(1)</script>'), false);
+  assert.equal(printed.source.includes('<img src=x onerror=1>'), false);
+  assert.match(printed.title, /INV-007/);
+});
+
+test('native invoice printing bridge delegates HTML to Android PrintManager', () => {
+  const match = html.match(/function printHtmlDocument\(html,title\)\{[^\n]+/);
+  assert.ok(match, 'printHtmlDocument handler is missing');
+  let received = null;
+  const context = {
+    window: { AndroidShare: { printHtml: (source, title) => { received = { source, title }; } } },
+    toast() {}
+  };
+  vm.runInNewContext(match[0], context);
+  assert.equal(context.printHtmlDocument('<html>invoice</html>', 'Invoice 1'), true);
+  assert.deepEqual(received, { source: '<html>invoice</html>', title: 'Invoice 1' });
+});
+
