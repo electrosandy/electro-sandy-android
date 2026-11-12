@@ -56,11 +56,11 @@ test('snapshot commit verifies all twelve categories and chunk integrity before 
   assert.ok(commit.length > 0, 'cloudCommitSnapshot implementation is missing');
   assert.match(commit, /categories\.size\(\) != 12/);
   assert.match(commit, /chunks\.size\(\) != count/);
-  assert.match(commit, /verifiedChunks\\.size\\(\\) != count/);
-  assert.match(commit, /isValidCloudCategoryPayload\\(category,categoryPayload\\.toString\\(\\)\\)/);
+  assert.match(commit, /verifiedChunks\.size\(\) != count/);
+  assert.match(commit, /isValidCloudCategoryPayload\(category,categoryPayload\.toString\(\)\)/);
   assert.ok(java.includes('private boolean isValidCloudCategoryPayload(String category, String payload)'), 'native Android commit must validate reconstructed category JSON');
-  assert.match(java, /new org\\.json\\.JSONArray\\(payload\\)/);
-  assert.match(java, /new org\\.json\\.JSONObject\\(payload\\)/);
+  assert.match(java, /new org\.json\.JSONArray\(payload\)/);
+  assert.match(java, /new org\.json\.JSONObject\(payload\)/);
   assert.match(commit, /runTransaction\(transaction ->/);
   assert.match(commit, /expectedBase\.equals\(currentId\)/);
   assert.match(commit, /transaction\.set\(snapshotRef, snapshotInfo\)/);
