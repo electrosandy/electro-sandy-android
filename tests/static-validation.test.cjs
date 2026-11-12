@@ -171,6 +171,7 @@ test('backup restore imports product photos and all core datasets', () => {
   };
   const context = {
     requireRole: () => true,
+    validBackupArrays: validateArrays,
     document: { getElementById: () => ({ value: '' }) },
     FileReader: class { readAsText() { this.result = JSON.stringify({ data: backup }); this.onload(); } },
     localStorage: storage, confirm: () => true,
