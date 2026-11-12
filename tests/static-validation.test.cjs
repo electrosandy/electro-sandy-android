@@ -93,7 +93,7 @@ test('backup restore rolls back every stored key when one write fails', () => {
   const end = html.indexOf('\nfunction restoreAutoBackup()', start);
   assert.ok(start >= 0 && end > start, 'importBackup handler is missing');
   const source = html.slice(start, end);
-  const arrays = html.match(/function validBackupArrays\\(data,required\\)\\{[^\\n]+/);
+  const arrays = html.match(/function validBackupArrays\(data,required\)\{[^\n]+/);
   const validateArrays = vm.runInNewContext('(' + arrays[0] + ')');
   const original = {
     es13_products: '[{"id":1}]',
@@ -155,7 +155,7 @@ test('backup restore imports product photos and all core datasets', () => {
   const end = html.indexOf('\nfunction restoreAutoBackup()', start);
   assert.ok(start >= 0 && end > start, 'importBackup handler is missing');
   const photo = 'data:image/jpeg;base64,restored';
-  const arrays = html.match(/function validBackupArrays\\(data,required\\)\\{[^\\n]+/);
+  const arrays = html.match(/function validBackupArrays\(data,required\)\{[^\n]+/);
   const validateArrays = vm.runInNewContext('(' + arrays[0] + ')');
   const backup = {
     products: [{ id: 9, image: photo, images: [photo] }],
