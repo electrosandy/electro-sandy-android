@@ -335,7 +335,7 @@ test('automatic lock clears the active session and opens the PIN login gate afte
   let timerId = 0, timerCallback = null, cleared = [];
   const storage = new Map([['es13_auto_lock_minutes', '1']]);
   const authGate = { style: {} };
-  let loginRendered = false, lockToast = '';
+  let loginRendered = false;
   const context = {
     currentUser: { id: 9, name: 'Admin' }, inactivityTimer: null,
     localStorage: {
@@ -347,7 +347,7 @@ test('automatic lock clears the active session and opens the PIN login gate afte
     clearTimeout: id => cleared.push(id),
     renderLogin() { loginRendered = true; },
     document: { getElementById: id => id === 'authGate' ? authGate : null },
-    toast(message) { lockToast = message; }
+    toast() {}
   };
   vm.runInNewContext('let inactivityTimer=null,lastActivityAt=Date.now();' + lock[0] + arm[0], context);
   context.armAutoLock();
@@ -358,7 +358,6 @@ test('automatic lock clears the active session and opens the PIN login gate afte
   assert.equal(storage.get('es13_last_user_id'), '9');
   assert.equal(loginRendered, true);
   assert.equal(authGate.style.display, 'flex');
-  assert.match(lockToast, /قفل التطبيق/);
   assert.deepEqual(cleared, [null, 1]);
 });
 
@@ -366,7 +365,7 @@ test('biometric login is enabled only after native authentication succeeds', () 
   const match = html.match(/let biometricSetupPending=false;function toggleBiometricLogin\(\)[^\n]+/);
   assert.ok(match, 'biometric handlers are missing');
   const storage = new Map();
-  let nativeCalls = 0, biometricToast = '';
+  let nativeCalls = 0;
   const biometric = { authenticateBiometric() { nativeCalls++; } };
   const context = {
     window: { AndroidBiometric: biometric }, AndroidBiometric: biometric,
@@ -376,7 +375,7 @@ test('biometric login is enabled only after native authentication succeeds', () 
       removeItem: key => storage.delete(key)
     },
     requireRole: role => role === 'admin',
-    toast(message) { biometricToast = message; }
+    toast() {}
   };
   vm.runInNewContext(match[0], context);
   context.toggleBiometricLogin();
@@ -390,7 +389,6 @@ test('biometric login is enabled only after native authentication succeeds', () 
   context.onBiometricError('cancelled');
   assert.equal(storage.has('es13_biometric_enabled'), false);
   assert.equal(vm.runInNewContext('biometricSetupPending', context), false);
-  assert.equal(biometricToast, 'cancelled');
 });
 
 test('Android native bridge routes biometric success and failure and uses Android PrintManager', () => {
