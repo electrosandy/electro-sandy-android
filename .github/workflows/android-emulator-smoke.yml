@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   emulator-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 55
     steps:
       - name: Checkout test branch
@@ -169,6 +169,15 @@ jobs:
           BASH
           chmod +x "$GITHUB_WORKSPACE/emulator-smoke.sh"
 
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Prepare emulator evidence directory
+        run: mkdir -p emulator-results
+
       - name: Boot emulator, install app and run launch checks
         timeout-minutes: 40
         uses: reactivecircus/android-emulator-runner@v2
@@ -177,10 +186,10 @@ jobs:
           target: default
           arch: x86_64
           profile: pixel_2
-          cores: 2
-          ram-size: 2048M
-          heap-size: 512M
-          emulator-boot-timeout: 900
+          cores: 4
+          ram-size: 4096M
+          heap-size: 1024M
+          emulator-boot-timeout: 1200
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           script: bash "$GITHUB_WORKSPACE/emulator-smoke.sh"
 
