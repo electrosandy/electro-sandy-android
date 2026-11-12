@@ -18,6 +18,7 @@ import android.print.PrintAttributes;
 import android.content.Context;
 import androidx.fragment.app.FragmentActivity;
 import androidx.biometric.BiometricPrompt;
+import androidx.biometric.BiometricManager;
 import androidx.core.content.ContextCompat;
 import android.speech.RecognizerIntent;
 import java.util.ArrayList;
@@ -76,6 +77,12 @@ public class MainActivity extends FragmentActivity {
                 if (!(activity instanceof MainActivity)) return;
                 MainActivity main = (MainActivity) activity;
                 try {
+                    int biometricAvailability = BiometricManager.from(main).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK);
+                    if (biometricAvailability != BiometricManager.BIOMETRIC_SUCCESS) {
+                        if (main.webView != null) main.webView.evaluateJavascript(
+                            "window.onBiometricError(" + JSONObject.quote("البصمة غير متاحة على هذا الجهاز؛ استعمل رمز PIN.") + ")", null);
+                        return;
+                    }
                     BiometricPrompt prompt = new BiometricPrompt(main, ContextCompat.getMainExecutor(main), new BiometricPrompt.AuthenticationCallback() {
                         @Override public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
                             if (main.webView != null) main.webView.evaluateJavascript("window.onBiometricAuthenticated()", null);
