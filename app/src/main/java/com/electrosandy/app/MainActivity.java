@@ -319,35 +319,29 @@ public class MainActivity extends FragmentActivity {
                                         snapshotInfo.put("createdAt", committedAt);
                                         snapshotInfo.put("schemaVersion", 1);
                                         snapshotInfo.put("status", "READY");
-                                        FirebaseFirestore.getInstance().collection("shops").document(uid)
-                                            .collection("snapshots").document(snapshotId).set(snapshotInfo)
-                                            .addOnSuccessListener(snapshotSaved -> {
-                                                Map<String,Object> pointer = new HashMap<>();
-                                                pointer.put("snapshotId", snapshotId);
-                                                pointer.put("categories", categories);
-                                                pointer.put("updatedAt", committedAt);
-                                                com.google.firebase.firestore.DocumentReference pointerRef = FirebaseFirestore.getInstance().collection("shops").document(uid)
-                                                    .collection("snapshotMeta").document("current");
-                                                if (requireBaseMatch) {
-                                                    String expectedBase = expectedBaseId == null ? "" : expectedBaseId;
-                                                    FirebaseFirestore.getInstance().runTransaction(transaction -> {
-                                                        com.google.firebase.firestore.DocumentSnapshot current = transaction.get(pointerRef);
-                                                        String currentId = current.exists() ? current.getString("snapshotId") : "";
-                                                        if (currentId == null) currentId = "";
-                                                        if (!expectedBase.equals(currentId)) return false;
-                                                        transaction.set(pointerRef, pointer);
-                                                        return true;
-                                                    }).addOnSuccessListener(committed -> {
-                                                        if (Boolean.TRUE.equals(committed)) sendCloudJs("window.onCloudSnapshotCommitted(true,'',"+JSONObject.quote(snapshotId)+")");
-                                                        else sendCloudJs("window.onCloudSnapshotCommitted(false,'CLOUD_CONFLICT: النسخة السحابية تغيرت من جهاز آخر',"+JSONObject.quote(snapshotId)+")");
-                                                    }).addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")"));
-                                                } else {
-                                                    pointerRef.set(pointer)
-                                                        .addOnSuccessListener(v -> sendCloudJs("window.onCloudSnapshotCommitted(true,'',"+JSONObject.quote(snapshotId)+")"))
-                                                        .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")"));
-                                                }
-                                            })
-                                            .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")"));
+                                        com.google.firebase.firestore.DocumentReference snapshotRef = FirebaseFirestore.getInstance().collection("shops").document(uid)
+                                            .collection("snapshots").document(snapshotId);
+                                        Map<String,Object> pointer = new HashMap<>();
+                                        pointer.put("snapshotId", snapshotId);
+                                        pointer.put("categories", categories);
+                                        pointer.put("updatedAt", committedAt);
+                                        com.google.firebase.firestore.DocumentReference pointerRef = FirebaseFirestore.getInstance().collection("shops").document(uid)
+                                            .collection("snapshotMeta").document("current");
+                                        String expectedBase = expectedBaseId == null ? "" : expectedBaseId;
+                                        FirebaseFirestore.getInstance().runTransaction(transaction -> {
+                                            com.google.firebase.firestore.DocumentSnapshot current = transaction.get(pointerRef);
+                                            String currentId = current.exists() ? current.getString("snapshotId") : "";
+                                            if (currentId == null) currentId = "";
+                                            if (requireBaseMatch && !expectedBase.equals(currentId)) return false;
+                                            // Publish the snapshot document and current pointer atomically.
+                                            // A stale client must not leave an orphan READY snapshot behind.
+                                            transaction.set(snapshotRef, snapshotInfo);
+                                            transaction.set(pointerRef, pointer);
+                                            return true;
+                                        }).addOnSuccessListener(committed -> {
+                                            if (Boolean.TRUE.equals(committed)) sendCloudJs("window.onCloudSnapshotCommitted(true,'',"+JSONObject.quote(snapshotId)+")");
+                                            else sendCloudJs("window.onCloudSnapshotCommitted(false,'CLOUD_CONFLICT: النسخة السحابية تغيرت من جهاز آخر',"+JSONObject.quote(snapshotId)+")");
+                                        }).addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")"));
                                     }
                                 })
                                 .addOnFailureListener(e -> {
