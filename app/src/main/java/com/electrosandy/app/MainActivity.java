@@ -152,6 +152,23 @@ public class MainActivity extends FragmentActivity {
                 "stockAudits","sellerProfile","activityLog","warranties","suppliers","returns"
             ).contains(category);
         }
+        private boolean isValidCloudCategoryPayload(String category, String payload) {
+            try {
+                if ("sellerProfile".equals(category)) {
+                    new org.json.JSONObject(payload);
+                    return true;
+                }
+                if (!isAllowedCloudCategory(category)) return false;
+                org.json.JSONArray array = new org.json.JSONArray(payload);
+                if (array.length() > 100000) return false;
+                for (int i = 0; i < array.length(); i++) {
+                    if (!(array.opt(i) instanceof org.json.JSONObject)) return false;
+                }
+                return true;
+            } catch (Exception invalidPayload) {
+                return false;
+            }
+        }
         private boolean isSafeSnapshotId(String snapshotId) {
             return snapshotId != null && snapshotId.matches("[a-z0-9-]{1,64}");
         }
@@ -295,19 +312,33 @@ public class MainActivity extends FragmentActivity {
                                         if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'أجزاء النسخة غير مكتملة',"+JSONObject.quote(snapshotId)+")");
                                         return;
                                     }
-                                    java.util.HashSet<Integer> indexes = new java.util.HashSet<>();
+                                    java.util.TreeMap<Integer,String> verifiedChunks = new java.util.TreeMap<>();
                                     for (QueryDocumentSnapshot chunk : chunks) {
                                         Long indexValue = chunk.getLong("index");
                                         String data = chunk.getString("data");
                                         if (indexValue == null || indexValue < 0 || indexValue >= count || data == null || data.length() > 100000
                                             || !String.format(Locale.US,"%06d",indexValue.intValue()).equals(chunk.getId())
-                                            || !indexes.add(indexValue.intValue())) {
+                                            || verifiedChunks.put(indexValue.intValue(),data) != null) {
                                             if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'جزء غير صالح داخل النسخة',"+JSONObject.quote(snapshotId)+")");
                                             return;
                                         }
                                     }
-                                    if (indexes.size() != count) {
+                                    if (verifiedChunks.size() != count) {
                                         if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'هناك أجزاء ناقصة داخل النسخة',"+JSONObject.quote(snapshotId)+")");
+                                        return;
+                                    }
+                                    StringBuilder categoryPayload = new StringBuilder();
+                                    for (int index = 0; index < count; index++) {
+                                        String chunkData = verifiedChunks.get(index);
+                                        if (chunkData == null) {
+                                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'هناك أجزاء ناقصة داخل النسخة',"+JSONObject.quote(snapshotId)+")");
+                                            return;
+                                        }
+                                        categoryPayload.append(chunkData);
+                                    }
+                                    if (!isValidCloudCategoryPayload(category,categoryPayload.toString())) {
+                                        if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'محتوى قسم غير صالح: '+"
+                                            + JSONObject.quote(category) + ","+JSONObject.quote(snapshotId)+")");
                                         return;
                                     }
                                     if (verifiedCount.incrementAndGet() == categories.size() && !failed.get()) {
