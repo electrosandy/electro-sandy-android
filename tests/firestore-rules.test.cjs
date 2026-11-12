@@ -98,28 +98,26 @@ test('shop owner can publish valid snapshot metadata but cannot publish malforme
 
 test('snapshot documents require all twelve categories and the supported schema/status', async () => {
   const db = ownerDb();
-  const ref = doc(db, 'shops/shop-owner/snapshots/snapshot-1');
-  await assertSucceeds(setDoc(ref, snapshot()));
+  await assertSucceeds(setDoc(
+    doc(db, 'shops/shop-owner/snapshots/snapshot-1'),
+    snapshot()
+  ));
 
-  await assertFails(setDoc(
-    doc(db, 'shops/shop-owner/snapshots/snapshot-2'),
-    snapshot({ categoryCount: 11 })
-  ));
-  await assertFails(setDoc(
-    doc(db, 'shops/shop-owner/snapshots/snapshot-3'),
-    snapshot({ schemaVersion: 2 })
-  ));
-  await assertFails(setDoc(
-    doc(db, 'shops/shop-owner/snapshots/snapshot-4'),
-    snapshot({ status: 'UPLOADING' })
-  ));
-  await assertFails(setDoc(
-    doc(db, 'shops/shop-owner/snapshots/snapshot-5'),
-    snapshot({ snapshotId: 'different-id' })
-  ));
+  const invalidCases = [
+    ['snapshot-2', { categoryCount: 11 }],
+    ['snapshot-3', { schemaVersion: 2 }],
+    ['snapshot-4', { status: 'UPLOADING' }],
+    ['snapshot-5', { categories: [...categories.slice(0, 11), 'unknown'] }]
+  ];
+  for (const [id, overrides] of invalidCases) {
+    await assertFails(setDoc(
+      doc(db, 'shops/shop-owner/snapshots/' + id),
+      snapshot({ ...overrides, snapshotId: id })
+    ));
+  }
   await assertFails(setDoc(
     doc(db, 'shops/shop-owner/snapshots/snapshot-6'),
-    snapshot({ categories: [...categories.slice(0, 11), 'unknown'] })
+    snapshot({ snapshotId: 'wrong-id' })
   ));
   await assertFails(setDoc(
     doc(ownerDb('another-user'), 'shops/shop-owner/snapshots/foreign'),
