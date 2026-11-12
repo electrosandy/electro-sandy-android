@@ -4,7 +4,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   initializeTestEnvironment,
-  assertSucceeds
 } = require('@firebase/rules-unit-testing');
 const {
   doc,
@@ -38,23 +37,9 @@ async function uploadSnapshot(db, id, recordsByCategory) {
       index: 0, data: payload, updatedAt: now
     });
   }
-  await setDoc(ref(db, snapshotPath(id)), {
-    snapshotId: id, categories: [...categories], categoryCount: 12,
-    createdAt: now, schemaVersion: 1, status: 'READY'
-  });
 }
 
 async function validateSnapshot(db, id) {
-  const root = await getDoc(ref(db, snapshotPath(id)));
-  if (!root.exists()) return false;
-  const data = root.data();
-  if (data.snapshotId !== id || data.status !== 'READY' ||
-      data.schemaVersion !== 1 || data.categoryCount !== 12 ||
-      !Array.isArray(data.categories) ||
-      data.categories.length !== 12 ||
-      new Set(data.categories).size !== 12 ||
-      categories.some(category => !data.categories.includes(category))) return false;
-
   for (const category of categories) {
     const meta = await getDoc(ref(db, `${snapshotPath(id)}/meta/${category}`));
     if (!meta.exists()) return false;
@@ -76,10 +61,15 @@ async function validateSnapshot(db, id) {
 async function commitSnapshot(db, id, expectedBaseId) {
   if (!(await validateSnapshot(db, id))) return false;
   const pointer = ref(db, pointerPath());
+  const snapshot = ref(db, snapshotPath(id));
   return runTransaction(db, async transaction => {
     const current = await transaction.get(pointer);
     const currentId = current.exists() ? current.data().snapshotId : '';
     if (currentId !== expectedBaseId) return false;
+    transaction.set(snapshot, {
+      snapshotId: id, categories: [...categories], categoryCount: 12,
+      createdAt: now + 1, schemaVersion: 1, status: 'READY'
+    });
     transaction.set(pointer, {
       snapshotId: id, categories: [...categories], updatedAt: now + 1
     });
@@ -95,6 +85,10 @@ async function seedSnapshot(id, records) {
   await env.withSecurityRulesDisabled(async context => {
     const adminDb = context.firestore();
     await uploadSnapshot(adminDb, id, records);
+    await setDoc(ref(adminDb, snapshotPath(id)), {
+      snapshotId: id, categories: [...categories], categoryCount: 12,
+      createdAt: now, schemaVersion: 1, status: 'READY'
+    });
     await setDoc(ref(adminDb, pointerPath()), {
       snapshotId: id, categories: [...categories], updatedAt: now
     });
@@ -139,6 +133,11 @@ test('two independent clients: stale base commit is rejected and cannot replace 
   const pointer = await getDoc(ref(deviceA, pointerPath()));
   assert.ok(['device-a-2', 'device-b-2'].includes(pointer.data().snapshotId));
   assert.equal(pointer.data().snapshotId, aResult ? 'device-a-2' : 'device-b-2');
+  const winner = aResult ? 'device-a-2' : 'device-b-2';
+  const loser = aResult ? 'device-b-2' : 'device-a-2';
+  assert.equal((await getDoc(ref(deviceA, snapshotPath(winner)))).exists(), true);
+  assert.equal((await getDoc(ref(deviceA, snapshotPath(loser)))).exists(), false,
+    'a rejected stale client must not leave an orphan snapshot document');
 });
 
 test('a committed full snapshot carries deletions to the other client without resurrecting removed records', async () => {
