@@ -93,6 +93,8 @@ test('backup restore rolls back every stored key when one write fails', () => {
   const end = html.indexOf('\nfunction restoreAutoBackup()', start);
   assert.ok(start >= 0 && end > start, 'importBackup handler is missing');
   const source = html.slice(start, end);
+  const arrays = html.match(/function validBackupArrays\\(data,required\\)\\{[^\\n]+/);
+  const validateArrays = vm.runInNewContext('(' + arrays[0] + ')');
   const original = {
     es13_products: '[{"id":1}]',
     es13_orders: '[]',
@@ -125,6 +127,7 @@ test('backup restore rolls back every stored key when one write fails', () => {
   const messages = [];
   const context = {
     requireRole: () => true,
+    validBackupArrays: validateArrays,
     document: { getElementById: () => ({ value: '' }) },
     FileReader: class { readAsText() { this.result = JSON.stringify({ data: backup }); this.onload(); } },
     localStorage: storage,
@@ -152,6 +155,8 @@ test('backup restore imports product photos and all core datasets', () => {
   const end = html.indexOf('\nfunction restoreAutoBackup()', start);
   assert.ok(start >= 0 && end > start, 'importBackup handler is missing');
   const photo = 'data:image/jpeg;base64,restored';
+  const arrays = html.match(/function validBackupArrays\\(data,required\\)\\{[^\\n]+/);
+  const validateArrays = vm.runInNewContext('(' + arrays[0] + ')');
   const backup = {
     products: [{ id: 9, image: photo, images: [photo] }],
     orders: [{ id: 8 }], customers: [{ id: 7 }], purchases: [{ id: 6 }],
