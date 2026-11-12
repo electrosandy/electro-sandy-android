@@ -341,7 +341,10 @@ test('printed period report rejects missing, invalid and reversed dates before g
 });
 
 test('printed period report accepts a valid date range and handles empty results', () => {
-  const reportMatch = html.match(/function printPeriodReport\\(\\)\\{[\\s\\S]*?\\n\\}/);\n  assert.ok(reportMatch, 'printPeriodReport handler is missing');\n  const report = reportMatch[0];
+  const reportStart = html.indexOf('function printPeriodReport(){');
+  const reportEnd = html.indexOf('function financialSummary', reportStart);
+  assert.ok(reportStart >= 0 && reportEnd > reportStart, 'printPeriodReport handler is missing');
+  const report = html.slice(reportStart, reportEnd).trim();
   const fields = { reportFrom: { value: '2026-11-01' }, reportTo: { value: '2026-11-12' } };
   let printed = null;
   const context = {
