@@ -91,6 +91,16 @@ function allRecords(overrides = {}) {
   return Object.fromEntries(categories.map(category => [category, overrides[category] || []]));
 }
 
+async function seedSnapshot(id, records) {
+  await env.withSecurityRulesDisabled(async context => {
+    const adminDb = context.firestore();
+    await uploadSnapshot(adminDb, id, records);
+    await setDoc(ref(adminDb, pointerPath()), {
+      snapshotId: id, categories: [...categories], updatedAt: now
+    });
+  });
+}
+
 test.before(async () => {
   env = await initializeTestEnvironment({
     projectId,
@@ -107,14 +117,10 @@ test.beforeEach(async () => {
 });
 
 test('two independent clients: stale base commit is rejected and cannot replace the winner pointer', async () => {
-  const admin = env.unauthenticatedContext().firestore();
   const deviceA = env.authenticatedContext(uid).firestore();
   const deviceB = env.authenticatedContext(uid).firestore();
 
-  await uploadSnapshot(admin, 'base-1', allRecords());
-  await setDoc(ref(admin, pointerPath()), {
-    snapshotId: 'base-1', categories: [...categories], updatedAt: now
-  });
+  await seedSnapshot('base-1', allRecords());
 
   await uploadSnapshot(deviceA, 'device-a-2', allRecords({
     products: [{ id: 'p1', name: 'A update' }]
@@ -138,14 +144,10 @@ test('two independent clients: stale base commit is rejected and cannot replace 
 test('a committed full snapshot carries deletions to the other client without resurrecting removed records', async () => {
   const deviceA = env.authenticatedContext(uid).firestore();
   const deviceB = env.authenticatedContext(uid).firestore();
-  const admin = env.unauthenticatedContext().firestore();
 
-  await uploadSnapshot(admin, 'base-1', allRecords({
+  await seedSnapshot('base-1', allRecords({
     products: [{ id: 'keep', name: 'Keep' }, { id: 'delete-me', name: 'Old item' }]
   }));
-  await setDoc(ref(admin, pointerPath()), {
-    snapshotId: 'base-1', categories: [...categories], updatedAt: now
-  });
 
   await uploadSnapshot(deviceA, 'after-delete', allRecords({
     products: [{ id: 'keep', name: 'Keep' }]
@@ -164,11 +166,7 @@ test('a committed full snapshot carries deletions to the other client without re
 
 test('incomplete or malformed snapshots are never published as the current pointer', async () => {
   const db = env.authenticatedContext(uid).firestore();
-  const admin = env.unauthenticatedContext().firestore();
-  await uploadSnapshot(admin, 'base-1', allRecords());
-  await setDoc(ref(admin, pointerPath()), {
-    snapshotId: 'base-1', categories: [...categories], updatedAt: now
-  });
+  await seedSnapshot('base-1', allRecords());
 
   await uploadSnapshot(db, 'broken-2', allRecords());
   await setDoc(ref(db, `${snapshotPath('broken-2')}/meta/returns`), {
