@@ -398,6 +398,8 @@ test('Android native bridge routes biometric success and failure and uses Androi
   assert.match(java, /window\.onBiometricAuthenticated\(\)/);
   assert.match(java, /window\.onBiometricError\(/);
   assert.match(java, /new BiometricPrompt\(main, ContextCompat\.getMainExecutor\(main\)/);
+  assert.match(java, /BiometricManager\.from\(main\)\.canAuthenticate\(BiometricManager\.Authenticators\.BIOMETRIC_WEAK\)/);
+  assert.match(java, /البصمة غير متاحة على هذا الجهاز؛ استعمل رمز PIN/);
   assert.match(java, /manager\.print\(/);
   assert.match(java, /createPrintDocumentAdapter\(jobName/);
 });
