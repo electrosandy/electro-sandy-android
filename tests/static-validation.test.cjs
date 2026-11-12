@@ -334,6 +334,7 @@ test('automatic lock clears the active session and opens the PIN login gate afte
   assert.ok(lock && arm, 'auto-lock handlers are missing');
   let timerId = 0, timerCallback = null, cleared = [];
   const storage = new Map([['es13_auto_lock_minutes', '1']]);
+  const authGate = { style: {} };
   const context = {
     currentUser: { id: 9, name: 'Admin' }, inactivityTimer: null,
     localStorage: {
@@ -344,7 +345,7 @@ test('automatic lock clears the active session and opens the PIN login gate afte
     setTimeout: callback => { timerCallback = callback; return ++timerId; },
     clearTimeout: id => cleared.push(id),
     renderLogin() { this.loginRendered = true; },
-    document: { getElementById: id => id === 'authGate' ? { style: {} } : null },
+    document: { getElementById: id => id === 'authGate' ? authGate : null },
     toast(message) { this.lastToast = message; }
   };
   vm.runInNewContext('let inactivityTimer=null,lastActivityAt=Date.now();' + lock[0] + arm[0], context);
@@ -355,7 +356,7 @@ test('automatic lock clears the active session and opens the PIN login gate afte
   assert.equal(context.currentUser, null);
   assert.equal(storage.get('es13_last_user_id'), '9');
   assert.equal(context.loginRendered, true);
-  assert.equal(context.document.getElementById('authGate').style.display, 'flex');
+  assert.equal(authGate.style.display, 'flex');
   assert.match(context.lastToast, /قفل التطبيق/);
   assert.deepEqual(cleared, [null, 1]);
 });
