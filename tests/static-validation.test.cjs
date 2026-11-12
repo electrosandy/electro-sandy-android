@@ -315,6 +315,45 @@ test('printed invoices include seller, customer, item, discount, returns, paid a
   assert.match(printed.title, /INV-007/);
 });
 
+test('printed period report rejects missing, invalid and reversed dates before generating output', () => {
+  const report = extractTestFunction('printPeriodReport');
+  const run = (from, to) => {
+    const messages = [];
+    let printCalls = 0;
+    const fields = { reportFrom: { value: from }, reportTo: { value: to } };
+    const context = {
+      document: { getElementById: id => fields[id] || null },
+      toast: message => messages.push(message),
+      orders: [], returns: [], cashEntries: [],
+      periodDate: () => null, periodSaleReceipts: () => 0,
+      printHtmlDocument: () => { printCalls++; }
+    };
+    vm.runInNewContext(report, context);
+    context.printPeriodReport();
+    return { messages, printCalls };
+  };
+  assert.deepEqual(run('', '2026-11-12'), { messages: ['حدد فترة التقرير أولاً'], printCalls: 0 });
+  assert.deepEqual(run('2026-02-30', '2026-03-01'), { messages: ['تاريخ الفترة غير صالح'], printCalls: 0 });
+  assert.deepEqual(run('2026-11-13', '2026-11-12'), { messages: ['تاريخ البداية خاصو يكون قبل تاريخ النهاية'], printCalls: 0 });
+});
+
+test('printed period report accepts a valid date range and handles empty results', () => {
+  const report = extractTestFunction('printPeriodReport');
+  const fields = { reportFrom: { value: '2026-11-01' }, reportTo: { value: '2026-11-12' } };
+  let printed = null;
+  const context = {
+    document: { getElementById: id => fields[id] || null },
+    toast() {}, orders: [], returns: [], cashEntries: [],
+    periodDate: () => null, periodSaleReceipts: () => 0,
+    printHtmlDocument: (html, title) => { printed = { html, title }; }
+  };
+  vm.runInNewContext(report, context);
+  context.printPeriodReport();
+  assert.ok(printed, 'valid period should generate a report');
+  assert.match(printed.html, /لا توجد فواتير/);
+  assert.match(printed.html, /لا توجد مرتجعات/);
+});
+
 test('native invoice printing bridge delegates HTML to Android PrintManager', () => {
   const match = html.match(/function printHtmlDocument\(html,title\)\{[^\n]+/);
   assert.ok(match, 'printHtmlDocument handler is missing');
