@@ -600,8 +600,16 @@ function printPeriodReport(){
 function exportPeriodReport(){
  let from=document.getElementById("reportFrom")?.value,to=document.getElementById("reportTo")?.value;
  if(!from||!to)return toast("حدد فترة التقرير أولاً");
- if(new Date(from+"T00:00:00")>new Date(to+"T23:59:59.999"))return toast("تاريخ البداية خاصو يكون قبل تاريخ النهاية");
- let list=orders.filter(o=>{let d=periodDate(o);return d&&d>=new Date(from+"T00:00:00")&&d<=new Date(to+"T23:59:59.999")}),
+ const parseReportDate=value=>{
+  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(value||"")))return null;
+  const date=new Date(value+"T00:00:00"),parts=value.split("-").map(Number);
+  return Number.isFinite(date.getTime())&&date.getFullYear()===parts[0]&&date.getMonth()+1===parts[1]&&date.getDate()===parts[2]?date:null;
+ };
+ const fromDate=parseReportDate(from),toDate=parseReportDate(to);
+ if(!fromDate||!toDate)return toast("تاريخ الفترة غير صالح");
+ const toEnd=new Date(toDate.getTime());toEnd.setHours(23,59,59,999);
+ if(fromDate>toEnd)return toast("تاريخ البداية خاصو يكون قبل تاريخ النهاية");
+ let list=orders.filter(o=>{let d=periodDate(o);return d&&d>=fromDate&&d<=toEnd}),
  rows=[["Invoice","Date","Customer","Salesperson","Total DH","Paid DH","Balance DH"],...list.map(o=>[o.invoiceNo||o.id,o.date,o.customerInfo?.name||o.customer,o.sellerUserName||"",o.total,o.paidAmount??Math.max(0,Number(o.total||0)-Number(o.balance||0)),o.balance||0])],
  quote=v=>'"'+String(v??"").replace(/"/g,'""')+'"',
  csv=String.fromCharCode(65279)+rows.map(row=>row.map(quote).join(";")).join(String.fromCharCode(13,10));

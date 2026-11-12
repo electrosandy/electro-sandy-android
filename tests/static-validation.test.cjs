@@ -340,6 +340,31 @@ test('printed period report rejects missing, invalid and reversed dates before g
   assert.deepEqual(run('2026-11-13', '2026-11-12'), { messages: ['تاريخ البداية خاصو يكون قبل تاريخ النهاية'], printCalls: 0 });
 });
 
+test('period report CSV export rejects missing, invalid and reversed dates', () => {
+  const start = html.indexOf('function exportPeriodReport(){');
+  const end = html.indexOf('function financialSummary', start);
+  assert.ok(start >= 0 && end > start, 'exportPeriodReport handler is missing');
+  const handler = html.slice(start, end).trim();
+  const run = (from, to) => {
+    const messages = [];
+    let exports = 0;
+    const fields = { reportFrom: { value: from }, reportTo: { value: to } };
+    const context = {
+      document: { getElementById: id => fields[id] || null },
+      toast: message => messages.push(message),
+      orders: [], periodDate: () => null,
+      saveTextFile: () => { exports++; }
+    };
+    vm.runInNewContext(handler, context);
+    context.exportPeriodReport();
+    return { messages, exports };
+  };
+  assert.deepEqual(run('', '2026-11-12'), { messages: ['حدد فترة التقرير أولاً'], exports: 0 });
+  assert.deepEqual(run('2026-02-30', '2026-03-01'), { messages: ['تاريخ الفترة غير صالح'], exports: 0 });
+  assert.deepEqual(run('not-a-date', '2026-03-01'), { messages: ['تاريخ الفترة غير صالح'], exports: 0 });
+  assert.deepEqual(run('2026-11-13', '2026-11-12'), { messages: ['تاريخ البداية خاصو يكون قبل تاريخ النهاية'], exports: 0 });
+});
+
 test('printed period report accepts a valid date range and handles empty results', () => {
   const reportStart = html.indexOf('function printPeriodReport(){');
   const reportEnd = html.indexOf('function financialSummary', reportStart);
