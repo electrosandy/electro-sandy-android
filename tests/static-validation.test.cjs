@@ -351,6 +351,7 @@ test('printed period report accepts a valid date range and handles empty results
     document: { getElementById: id => fields[id] || null },
     toast() {}, orders: [], returns: [], cashEntries: [],
     periodDate: () => null, periodSaleReceipts: () => 0,
+    statementEscape: value => String(value ?? ''),
     printHtmlDocument: (html, title) => { printed = { html, title }; }
   };
   vm.runInNewContext(report, context);
