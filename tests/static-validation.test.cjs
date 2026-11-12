@@ -402,3 +402,36 @@ test('Android native bridge routes biometric success and failure and uses Androi
   assert.match(java, /createPrintDocumentAdapter\(jobName/);
 });
 
+test('successful biometric login restores only the last active saved user', () => {
+  const match = html.match(/let biometricSetupPending=false;function toggleBiometricLogin\(\)[^\n]+/);
+  assert.ok(match, 'biometric handlers are missing');
+  const user = { id: 42, name: 'Admin', role: 'admin', active: true };
+  const storage = new Map([['es13_last_user_id', '42'], ['es13_biometric_enabled', '1']]);
+  const authGate = { style: { display: 'flex' } };
+  const events = [];
+  let nativeCalls = 0;
+  const biometric = { authenticateBiometric() { nativeCalls++; } };
+  const context = {
+    currentUser: null, appUsers: [user],
+    window: { AndroidBiometric: biometric, AndroidShare: { cloudCheckAuth() {} } },
+    AndroidBiometric: biometric,
+    localStorage: {
+      getItem: key => storage.has(key) ? storage.get(key) : null,
+      setItem: (key, value) => storage.set(key, String(value)),
+      removeItem: key => storage.delete(key)
+    },
+    document: { getElementById: id => id === 'authGate' ? authGate : null },
+    updateCurrentUserBadge() {}, armAutoLock() {},
+    logActivity: (action, detail) => events.push({ action, detail }),
+    toast() {}
+  };
+  vm.runInNewContext(match[0], context);
+  context.loginWithBiometric();
+  assert.equal(nativeCalls, 1);
+  context.onBiometricAuthenticated();
+  assert.equal(context.currentUser.id, 42);
+  assert.equal(authGate.style.display, 'none');
+  assert.equal(events.length, 1);
+  assert.match(events[0].action, /دخول بالبصمة/);
+});
+
