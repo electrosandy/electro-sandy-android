@@ -13,6 +13,16 @@ import android.webkit.WebResourceRequest;
 import android.webkit.ValueCallback;
 import android.content.Intent;
 import android.net.Uri;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.ImageDecoder;
+import android.graphics.Matrix;
+import android.os.Build;
+import androidx.core.content.FileProvider;
+import androidx.exifinterface.media.ExifInterface;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import android.print.PrintManager;
 import android.print.PrintAttributes;
 import android.content.Context;
@@ -605,9 +615,12 @@ public class MainActivity extends FragmentActivity {
                 if (fileCallback != null) fileCallback.onReceiveValue(null);
                 fileCallback = callback;
                 try {
-                    Intent intent = params.createIntent();
+                    Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("image/*");
+                    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
                     intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    startActivityForResult(intent, FILE_CHOOSER);
+                    startActivityForResult(Intent.createChooser(intent, "اختيار صور المنتج"), FILE_CHOOSER);
                 } catch (Exception e) {
                     Log.e("ELECTRO_FILES", "Unable to open image picker", e);
                     if (fileCallback != null) fileCallback.onReceiveValue(null);
@@ -678,6 +691,87 @@ public class MainActivity extends FragmentActivity {
         }, "ELECTRO-Sandy-FileSave").start();
     }
 
+
+    // Normalize selected formats natively before WebView reads them.
+    private Uri normalizeProductImage(Uri source, int index) throws Exception {
+        Bitmap bitmap = null;
+        if (Build.VERSION.SDK_INT >= 28) {
+            ImageDecoder.Source imageSource = ImageDecoder.createSource(getContentResolver(), source);
+            bitmap = ImageDecoder.decodeBitmap(imageSource, (decoder, info, src) -> {
+                decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE);
+                int width = info.getSize().getWidth(), height = info.getSize().getHeight();
+                int max = Math.max(width, height);
+                if (max > 2048) {
+                    float scale = 2048f / max;
+                    decoder.setTargetSize(Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale)));
+                }
+            });
+        } else {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            try (InputStream in = getContentResolver().openInputStream(source)) {
+                if (in == null) throw new IOException("تعذر فتح الصورة");
+                BitmapFactory.decodeStream(in, null, bounds);
+            }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new IOException("صيغة الصورة غير مدعومة");
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            int largest = Math.max(bounds.outWidth, bounds.outHeight);
+            while (largest / options.inSampleSize > 2048) options.inSampleSize *= 2;
+            try (InputStream in = getContentResolver().openInputStream(source)) {
+                if (in == null) throw new IOException("تعذر فتح الصورة");
+                bitmap = BitmapFactory.decodeStream(in, null, options);
+            }
+            if (bitmap == null) throw new IOException("تعذر فك ترميز الصورة");
+            try (InputStream in = getContentResolver().openInputStream(source)) {
+                if (in != null) {
+                    int orientation = new ExifInterface(in).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+                    Matrix matrix = new Matrix();
+                    if (orientation == ExifInterface.ORIENTATION_ROTATE_90) matrix.postRotate(90);
+                    else if (orientation == ExifInterface.ORIENTATION_ROTATE_180) matrix.postRotate(180);
+                    else if (orientation == ExifInterface.ORIENTATION_ROTATE_270) matrix.postRotate(270);
+                    else if (orientation == ExifInterface.ORIENTATION_FLIP_HORIZONTAL) matrix.preScale(-1, 1);
+                    else if (orientation == ExifInterface.ORIENTATION_FLIP_VERTICAL) matrix.preScale(1, -1);
+                    if (!matrix.isIdentity()) {
+                        Bitmap rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+                        if (rotated != bitmap) bitmap.recycle();
+                        bitmap = rotated;
+                    }
+                }
+            }
+        }
+        if (bitmap == null || bitmap.getWidth() < 1 || bitmap.getHeight() < 1) throw new IOException("ملف الصورة غير صالح");
+        File directory = new File(getCacheDir(), "product-images");
+        if (!directory.exists() && !directory.mkdirs()) throw new IOException("تعذر إنشاء مساحة مؤقتة للصور");
+        File[] old = directory.listFiles();
+        if (old != null) for (File item : old) if (System.currentTimeMillis() - item.lastModified() > 86400000L) item.delete();
+        File output = new File(directory, "product-" + System.currentTimeMillis() + "-" + index + ".jpg");
+        try (FileOutputStream stream = new FileOutputStream(output)) {
+            if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 88, stream)) throw new IOException("تعذر تحويل الصورة إلى JPEG");
+            stream.flush();
+        } finally {
+            bitmap.recycle();
+        }
+        return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", output);
+    }
+
+    private Uri[] normalizeSelectedImages(Uri[] selected) {
+        if (selected == null || selected.length == 0) return null;
+        ArrayList<Uri> normalized = new ArrayList<>();
+        for (int i = 0; i < selected.length; i++) {
+            try {
+                normalized.add(normalizeProductImage(selected[i], i));
+            } catch (Exception error) {
+                Log.e("ELECTRO_IMAGES", "Image conversion failed index=" + i + " uri=" + selected[i], error);
+                if (webView != null) {
+                    String message = "تعذر قراءة إحدى الصور المختارة. جرّب حفظها من جديد ثم أعد الاختيار.";
+                    webView.post(() -> webView.evaluateJavascript("window.toast && window.toast(" + JSONObject.quote(message) + ")", null));
+                }
+                return null;
+            }
+        }
+        return normalized.toArray(new Uri[0]);
+    }
+
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == FILE_SAVE) {
@@ -716,6 +810,7 @@ public class MainActivity extends FragmentActivity {
                 if ((result == null || result.length == 0) && data.getData() != null) result = new Uri[]{data.getData()};
             }
             Log.i("ELECTRO_FILES", "Image picker resultCode=" + resultCode + " selected=" + (result == null ? 0 : result.length));
+            if (result != null && result.length > 0) result = normalizeSelectedImages(result);
             ValueCallback<Uri[]> callback = fileCallback;
             fileCallback = null;
             callback.onReceiveValue(result);
