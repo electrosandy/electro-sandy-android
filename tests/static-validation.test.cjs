@@ -713,3 +713,29 @@ test('successful biometric login restores only the last active saved user', () =
   assert.match(events[0].action, /دخول بالبصمة/);
 });
 
+
+
+test('native product image picker normalizes supported Android image formats to JPEG', () => {
+  const javaPath = path.join(__dirname, '..', 'app', 'src', 'main', 'java', 'com', 'electrosandy', 'app', 'MainActivity.java');
+  const manifestPath = path.join(__dirname, '..', 'app', 'src', 'main', 'AndroidManifest.xml');
+  const gradlePath = path.join(__dirname, '..', 'app', 'build.gradle');
+  const providerPath = path.join(__dirname, '..', 'app', 'src', 'main', 'res', 'xml', 'product_image_paths.xml');
+  const java = fs.readFileSync(javaPath, 'utf8');
+  const manifest = fs.readFileSync(manifestPath, 'utf8');
+  const gradle = fs.readFileSync(gradlePath, 'utf8');
+  const provider = fs.readFileSync(providerPath, 'utf8');
+  assert.match(java, /new Intent\(Intent\.ACTION_GET_CONTENT\)/);
+  assert.match(java, /intent\.setType\("image\/\*"/);
+  assert.match(java, /Intent\.EXTRA_ALLOW_MULTIPLE/);
+  assert.match(java, /ImageDecoder\.decodeBitmap/);
+  assert.match(java, /BitmapFactory\.decodeStream/);
+  assert.match(java, /new ExifInterface\(in\)/);
+  assert.match(java, /Bitmap\.CompressFormat\.JPEG/);
+  assert.match(java, /getPackageName\(\) \+ "\.fileprovider"/);
+  assert.match(java, /selected\.length > 3/);
+  assert.match(manifest, /androidx\.core\.content\.FileProvider/);
+  assert.match(manifest, /\$\{applicationId\}\.fileprovider/);
+  assert.match(gradle, /androidx\.exifinterface:exifinterface/);
+  assert.match(provider, /cache-path name="product_images" path="product-images\/"\s*\//);
+  assert.match(html, /accept="image\/\*"[^>]*multiple/);
+});
