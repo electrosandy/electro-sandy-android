@@ -1,0 +1,13 @@
+{
+  "name": "electro-sandy-browser-preview",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite app/src/main/assets/www --host 0.0.0.0",
+    "preview": "vite preview app/src/main/assets/www --host 0.0.0.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
