@@ -250,7 +250,7 @@ test('product image picker previews selected photos through blob URLs and accept
   assert.match(html, /URL\.createObjectURL\(file\)/);
   assert.match(html, /file\.type&&!String\(file\.type\)\.toLowerCase\(\)\.startsWith\('image\/'\)/);
   assert.match(html, /تعذر عرض الصورة المختارة/);
-  assert.match(html, /صيغة الصورة غير مدعومة على هذا الجهاز/);
+  assert.match(html, /تعذر قراءة الصورة؛ جرّب حفظها بصيغة JPG أو PNG/);
 });
 
 test('product image picker reports empty selections and verifies saved images', () => {
