@@ -23,6 +23,7 @@ import androidx.exifinterface.media.ExifInterface;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.IOException;
 import android.print.PrintManager;
 import android.print.PrintAttributes;
 import android.content.Context;
