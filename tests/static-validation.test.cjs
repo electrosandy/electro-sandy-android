@@ -361,7 +361,7 @@ test('product image compression preserves small image dimensions without upscali
 test('product image compression rejects inaccessible, non-image and unreadable files', async () => {
   await assert.rejects(createImageCompressionHarness({ urlError: true }).compress(), /تعذر فتح ملف الصورة من الهاتف/);
   await assert.rejects(createImageCompressionHarness({ fileType: 'text/plain' }).compress(), /الملف المختار ليس صورة قابلة للقراءة/);
-  await assert.rejects(createImageCompressionHarness({ imageError: true }).compress(), /صيغة الصورة غير مدعومة على هذا الجهاز/);
+  await assert.rejects(createImageCompressionHarness({ imageError: true }).compress(), /تعذر قراءة الصورة؛ جرّب حفظها بصيغة JPG أو PNG/);
 });
 
 test('product image compression rejects invalid dimensions, missing canvas context and invalid JPEG output', async () => {
