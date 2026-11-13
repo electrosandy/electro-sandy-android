@@ -14,6 +14,8 @@ import android.webkit.ValueCallback;
 import android.content.Intent;
 import android.net.Uri;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.BitmapFactory;
 import android.graphics.ImageDecoder;
 import android.graphics.Matrix;
@@ -741,6 +743,13 @@ public class MainActivity extends FragmentActivity {
             }
         }
         if (bitmap == null || bitmap.getWidth() < 1 || bitmap.getHeight() < 1) throw new IOException("ملف الصورة غير صالح");
+        // JPEG has no alpha channel; composite transparent PNG/WebP pixels on white.
+        Bitmap opaque = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(opaque);
+        canvas.drawColor(Color.WHITE);
+        canvas.drawBitmap(bitmap, 0, 0, null);
+        bitmap.recycle();
+        bitmap = opaque;
         File directory = new File(getCacheDir(), "product-images");
         if (!directory.exists() && !directory.mkdirs()) throw new IOException("تعذر إنشاء مساحة مؤقتة للصور");
         File[] old = directory.listFiles();
@@ -757,6 +766,10 @@ public class MainActivity extends FragmentActivity {
 
     private Uri[] normalizeSelectedImages(Uri[] selected) {
         if (selected == null || selected.length == 0) return null;
+        if (selected.length > 3) {
+            if (webView != null) webView.post(() -> webView.evaluateJavascript("window.toast && window.toast('الحد الأقصى هو 3 صور لكل منتج')", null));
+            return null;
+        }
         ArrayList<Uri> normalized = new ArrayList<>();
         for (int i = 0; i < selected.length; i++) {
             try {
