@@ -739,3 +739,45 @@ test('native product image picker normalizes supported Android image formats to 
   assert.match(provider, /cache-path name="product_images" path="product-images\/"\s*\//);
   assert.match(html, /accept="image\/\*"[^>]*multiple/);
 });
+
+
+test('Arabic, French and English language selection persists and sets layout direction', () => {
+  const start = html.indexOf('function applyLanguage(lang,save=true){');
+  const end = html.indexOf('function productImageList(', start);
+  assert.ok(start >= 0 && end > start, 'language handlers are missing');
+  const handlers = html.slice(start, end);
+  const classes = new Set();
+  const root = { lang: '', dir: '' };
+  const button = { textContent: '' };
+  const values = new Map();
+  const context = {
+    document: {
+      body: { classList: {
+        remove: (...items) => items.forEach(x => classes.delete(x)),
+        add: item => classes.add(item)
+      }},
+      documentElement: root,
+      getElementById: id => id === 'langBtn' ? button : null
+    },
+    localStorage: {
+      setItem: (key, value) => values.set(key, value),
+      getItem: key => values.get(key) || null
+    }
+  };
+  vm.runInNewContext(handlers, context);
+  context.applyLanguage('ar');
+  assert.equal(root.lang, 'ar');
+  assert.equal(root.dir, 'rtl');
+  context.toggleLang();
+  assert.equal(root.lang, 'fr');
+  assert.equal(root.dir, 'ltr');
+  assert.equal(values.get('es13_language'), 'fr');
+  context.toggleLang();
+  assert.equal(root.lang, 'en');
+  assert.equal(button.textContent, 'EN');
+  context.toggleLang();
+  assert.equal(root.lang, 'ar');
+  assert.equal(button.textContent, 'AR');
+  assert.match(html, /<span class="langen">Quick actions<\\/span>/);
+  assert.match(html, /<span class="langen">New sale<\\/span>/);
+});
