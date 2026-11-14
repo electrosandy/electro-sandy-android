@@ -29,6 +29,10 @@ These are code-level observations, not proof that every screen or flow is bug-fr
 - SKU is preserved on create/edit, included in product search and displayed in the product list.
 - Added Arabic, English and French translations for the new field and duplicate-SKU validation.
 - Added regression tests and included them in the GitHub Actions test command.
+- Added product archiving/restoration so historical products are retained instead of deleted; archived products are excluded from sales and blocked from cart insertion.
+- Prevented archiving while the product is in the active cart and roll back the archive flag if local persistence fails.
+- Added Arabic, English and French translations and automated tests for archive/restore behavior.
+- Product-management search now includes the internal SKU as well as name, category and barcode.
 
 ## Feature work still required
 
