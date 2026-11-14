@@ -26,7 +26,7 @@ jobs:
 
       - name: Run regression tests
         run: |
-          node --test tests/cash-accounting.test.cjs tests/financial-regression.test.cjs tests/static-validation.test.cjs tests/cloud-sync.test.cjs tests/inventory-sku.test.cjs tests/product-archive.test.cjs
+          node --test tests/cash-accounting.test.cjs tests/financial-regression.test.cjs tests/static-validation.test.cjs tests/cloud-sync.test.cjs tests/inventory-sku.test.cjs tests/product-archive.test.cjs tests/stock-transfer-history.test.cjs
 
       - name: Set up Node.js for Firestore rules tests
         uses: actions/setup-node@v4
