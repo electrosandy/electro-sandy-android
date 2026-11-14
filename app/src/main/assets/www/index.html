@@ -482,6 +482,7 @@ function applyLanguage(lang,save=true){
  if(typeof translateDocumentText==='function')translateDocumentText();
  return lang
 }
+function toggleLang(){applyLanguage(document.documentElement.lang==='ar'?'fr':'ar')}
 const extraTranslations={
 "تغيير المظهر":["Change theme","Changer le thème"],
 "بحث بالاسم أو Barcode / QR":["Search by name or Barcode / QR","Rechercher par nom ou code-barres / QR"],
