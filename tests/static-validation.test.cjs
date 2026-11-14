@@ -757,8 +757,11 @@ test('Arabic, French and English language selection persists and sets layout dir
         add: item => classes.add(item)
       }},
       documentElement: root,
+      createTreeWalker: () => ({ nextNode: () => null }),
+      querySelectorAll: () => [],
       getElementById: id => id === 'langSelect' ? selector : null
     },
+    NodeFilter: { SHOW_TEXT: 4 },
     localStorage: {
       setItem: (key, value) => values.set(key, value),
       getItem: key => values.get(key) || null
