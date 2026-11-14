@@ -612,7 +612,7 @@ function translateDocumentText(){
  while((node=walker.nextNode())){
   if(node.parentElement&&node.parentElement.closest('.langar,.langfr,.langen,script,style'))continue;
   const original=translatedTextNodes.get(node)||node.nodeValue;
-  if(lang==='ar'){if(translatedTextNodes.has(node))node.nodeValue=original;continue;}
+  if(lang==='ar'){if(translatedTextNodes.has(node)&&node.nodeValue!==original)node.nodeValue=original;continue;}
   const trimmed=original.trim();
   const matchKey=extraTranslations[trimmed]?trimmed:Object.keys(extraTranslations).filter(key=>key.length>=6&&trimmed.startsWith(key)).sort((x,y)=>y.length-x.length)[0];
   const pair=matchKey?extraTranslations[matchKey]:null;
