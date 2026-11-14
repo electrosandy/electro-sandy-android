@@ -886,3 +886,35 @@ test('Arabic toast, alert and confirmation messages have English and French tran
     assert.ok(pair.every(value => typeof value === 'string' && value.length > 0), 'Empty translation: ' + source);
   }
 });
+
+
+test('native alert and confirmation dialogs are translated to the selected language', () => {
+  const start = html.indexOf('function applyLanguage(lang,save=true){');
+  const end = html.indexOf('function productImageList(', start);
+  const shown = [];
+  const nativeWindow = {
+    alert: message => shown.push(['alert', message]),
+    confirm: message => { shown.push(['confirm', message]); return true; }
+  };
+  const context = {
+    window: nativeWindow,
+    document: {
+      body: { classList: { remove: () => {}, add: () => {} } },
+      documentElement: { lang: 'ar', dir: 'rtl' },
+      createTreeWalker: () => ({ nextNode: () => null }),
+      querySelectorAll: () => [],
+      getElementById: () => null
+    },
+    NodeFilter: { SHOW_TEXT: 4 },
+    localStorage: { setItem: () => {}, getItem: () => null }
+  };
+  vm.runInNewContext(html.slice(start, end), context);
+  context.applyLanguage('en');
+  nativeWindow.alert('تم تسجيل البيع بنجاح');
+  assert.equal(shown[0][1], 'Sale recorded successfully');
+  assert.equal(nativeWindow.confirm('حذف المستخدم'), true);
+  assert.equal(shown[1][1], 'Delete user');
+  context.applyLanguage('fr');
+  nativeWindow.alert('تم تسجيل البيع بنجاح');
+  assert.equal(shown[2][1], 'Vente enregistrée avec succès');
+});
