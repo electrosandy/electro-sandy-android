@@ -758,7 +758,7 @@ test('Arabic, French and English language selection persists and sets layout dir
       }},
       documentElement: root,
       createTreeWalker: () => ({ nextNode: () => null }),
-      querySelectorAll: () => [inputElement],
+      querySelectorAll: () => [],
       getElementById: id => id === 'langSelect' ? selector : null
     },
     NodeFilter: { SHOW_TEXT: 4 },
@@ -835,7 +835,7 @@ test('dynamic text prefixes translate and restore without changing their values'
         let used = false;
         return { nextNode: () => used ? null : (used = true, textNode) };
       },
-      querySelectorAll: () => [],
+      querySelectorAll: () => [inputElement],
       getElementById: id => id === 'langSelect' ? selector : null
     },
     NodeFilter: { SHOW_TEXT: 4 },
