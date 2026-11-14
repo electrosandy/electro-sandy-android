@@ -649,7 +649,7 @@ function translateDocumentText(){
    if(!element.hasAttribute(name))return;
    const current=element.getAttribute(name);
    if(lang==='ar'){
-    if(originals.has(name))element.setAttribute(name,originals.get(name));
+    if(originals.has(name)&&current!==originals.get(name))element.setAttribute(name,originals.get(name));
     return;
    }
    const original=originals.has(name)?originals.get(name):current;
@@ -667,7 +667,7 @@ function initLanguage(){
  translateDocumentText();
  if(!languageObserver&&typeof MutationObserver!=='undefined'){
   languageObserver=new MutationObserver(()=>translateDocumentText());
-  languageObserver.observe(document.body,{childList:true,subtree:true,characterData:true});
+  languageObserver.observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['placeholder','title','aria-label','alt']});
  }
 }
 function productImageList(p){if(!p||typeof p!=='object')return[];let list=Array.isArray(p.images)?p.images.slice():[];if(p.image&&!list.includes(p.image))list.unshift(p.image);return list.filter(x=>typeof x==='string'&&x.startsWith('data:image/')).slice(0,3)}
