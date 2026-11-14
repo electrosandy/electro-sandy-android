@@ -640,7 +640,7 @@ function translateDocumentText(){
   const original=translatedTextNodes.get(node)||node.nodeValue;
   if(lang==='ar'){if(translatedTextNodes.has(node)&&node.nodeValue!==original)node.nodeValue=original;continue;}
   const trimmed=original.trim();
-  const dynamicCount=trimmed.match(/^(\\d+)\\s+(عملية اليوم|منتج|وحدة مباعة|فاتورة)$/);
+  const dynamicCount=trimmed.match(/^(\d+)\s+(عملية اليوم|منتج|وحدة مباعة|فاتورة)$/);
   if(dynamicCount){
    const forms={
     'عملية اليوم':[dynamicCount[1]+' operations today',dynamicCount[1]+' opérations aujourd’hui'],
