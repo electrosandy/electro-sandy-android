@@ -8,13 +8,12 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'app/src/main/assets/www
 
 test('SKU field is persisted, editable, searchable and reset between product forms', () => {
   assert.match(html, /id="newSku"/);
-  assert.match(html, /sku= document\.getElementById/); // whitespace-tolerant fallback below
   assert.match(html, /sku=document\.getElementById\('newSku'\)\.value\.trim\(\)/);
   assert.match(html, /p\.sku=sku/);
   assert.match(html, /products\.push\(\{id,name,category,barcode,sku,price/);
-  assert.match(html, /newSku'\)\.value=p\.sku\|\|''/);
-  assert.match(html, /newSku'\)\.value=''/);
-  assert.match(html, /String\(p\.sku\|\|' '\)/.test(html) ? /newSku/ : /String\(p\.sku\|\|''\)/);
+  assert.match(html, /document\.getElementById\('newSku'\)\.value=p\.sku\|\|''/);
+  assert.match(html, /document\.getElementById\('newSku'\)\.value=''/);
+  assert.match(html, /String\(p\.sku\|\|''\)/);
 });
 
 test('SKU uniqueness is case-insensitive, ignores surrounding spaces and permits editing the same product', () => {
