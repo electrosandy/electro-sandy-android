@@ -602,6 +602,7 @@ const extraTranslations={
 "تعذر حفظ البيانات بسبب مساحة التخزين؛ تمت إعادة البيانات إلى آخر نسخة محفوظة":["Could not save data because storage is full; data was restored to the last saved version","Impossible d’enregistrer les données car l’espace de stockage est insuffisant ; les données ont été restaurées à la dernière version enregistrée"]
 };
 const translatedTextNodes=new WeakMap();
+const translatedAttributes=new WeakMap();
 function translateDocumentText(){
  const lang=document.documentElement.lang||'ar';
  const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
@@ -615,6 +616,22 @@ function translateDocumentText(){
   translatedTextNodes.set(node,original);
   node.nodeValue=original.replace(original.trim(),pair[lang==='en'?0:1]);
  }
+ const attributeNames=['placeholder','title','aria-label','alt'];
+ document.querySelectorAll('[placeholder],[title],[aria-label],[alt]').forEach(element=>{
+  let originals=translatedAttributes.get(element);
+  if(!originals){originals=new Map();translatedAttributes.set(element,originals);}
+  attributeNames.forEach(name=>{
+   if(!element.hasAttribute(name))return;
+   const current=element.getAttribute(name);
+   if(lang==='ar'){
+    if(originals.has(name))element.setAttribute(name,originals.get(name));
+    return;
+   }
+   const original=originals.has(name)?originals.get(name):current;
+   const pair=extraTranslations[original.trim()];
+   if(pair){originals.set(name,original);element.setAttribute(name,original.replace(original.trim(),pair[lang==='en'?0:1]));}
+  });
+ });
 }
 let languageObserver=null;
 function initLanguage(){
