@@ -249,7 +249,7 @@ test('product image picker previews selected photos through blob URLs and accept
   assert.match(html, /function previewNewProductImages\(input\)/);
   assert.match(html, /URL\.createObjectURL\(file\)/);
   assert.match(html, /file\.type&&!String\(file\.type\)\.toLowerCase\(\)\.startsWith\('image\/'\)/);
-  assert.match(html, /تعذر عرض الصورة المختارة/);
+  assert.match(html, /تعذر عرض الصورة بعد تجهيزها؛ حاول اختيارها مرة أخرى/);
   assert.match(html, /تعذر قراءة الصورة؛ جرّب حفظها بصيغة JPG أو PNG/);
 });
 
