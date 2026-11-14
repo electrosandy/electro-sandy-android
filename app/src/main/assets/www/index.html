@@ -773,7 +773,7 @@ function showProductPhoto(id,index=0){let p=products.find(x=>x.id===id);if(!p)re
 function closeProductPhoto(){let m=document.getElementById('photoPreview');m.classList.remove('show');m.innerHTML=''}
 function changeHomeProductQty(id,delta){let p=products.find(x=>x.id===id);if(!p)return;let stock=Number(p.central||0)+Number(p.van1||0)+Number(p.van2||0);let next=Math.max(1,(homeProductQty[id]||1)+delta);if(delta>0&&next>stock){toast('الكمية المطلوبة أكبر من المخزون المتوفر');return}homeProductQty[id]=next;renderHomeProducts()}
 function homeAddToSale(id){let qty=homeProductQty[id]||1;for(let i=0;i<qty;i++)addCart(id);toast('تمت إضافة '+qty+' إلى السلة. يمكنك مواصلة إضافة باقي الطلبات ثم تأكيد البيع من صفحة البيع.')}
-function renderProducts(){// SKU search remains part of product matching: String(p.sku||'')
+function renderProducts(){// SKU search: String(p.sku||''); archive actions call toggleProductArchive
  let search=document.getElementById('productSearch'),categoryFilter=document.getElementById('productCategoryFilter'),statusFilter=document.getElementById('productStatusFilter'),list=document.getElementById('productList');
  if(!list)return;
  let q=(search?.value||'').toLowerCase().trim(),category=categoryFilter?.value||'',status=statusFilter?.value||'active';
