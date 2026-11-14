@@ -799,8 +799,8 @@ test('Arabic, French and English language selection persists and sets layout dir
   assert.equal(restoredRoot.lang, 'en');
   assert.equal(restoredRoot.dir, 'ltr');
   assert.equal(restoredSelector.value, 'en');
-  assert.match(html, /<span class="langen">Quick actions<\\/span>/);
-  assert.match(html, /<span class="langen">New sale<\\/span>/);
+  assert.match(html, /<span class="langen">Quick actions<\/span>/);
+  assert.match(html, /<span class="langen">New sale<\/span>/);
   assert.match(html, /id="langSelect"/);
 });
 
