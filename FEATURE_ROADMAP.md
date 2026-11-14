@@ -33,6 +33,9 @@ These are code-level observations, not proof that every screen or flow is bug-fr
 - Prevented archiving while the product is in the active cart and roll back the archive flag if local persistence fails.
 - Added Arabic, English and French translations and automated tests for archive/restore behavior.
 - Product-management search now includes the internal SKU as well as name, category and barcode.
+- Stock transfers now create durable movement-ledger entries in the existing stock-audit dataset, including source/destination, quantity, actor, timestamp and moved serial numbers; the stock history displays these entries alongside stocktakes.
+- Archived products are blocked from stock transfers, and insufficient serial-number inventory is rejected before movement.
+- Added automated transfer-ledger and serial-movement regression tests.
 
 ## Feature work still required
 
