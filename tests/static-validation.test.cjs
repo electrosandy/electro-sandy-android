@@ -758,7 +758,7 @@ test('Arabic, French and English language selection persists and sets layout dir
       }},
       documentElement: root,
       createTreeWalker: () => ({ nextNode: () => null }),
-      querySelectorAll: () => [],
+      querySelectorAll: () => [inputElement],
       getElementById: id => id === 'langSelect' ? selector : null
     },
     NodeFilter: { SHOW_TEXT: 4 },
@@ -818,6 +818,12 @@ test('dynamic text prefixes translate and restore without changing their values'
     nodeValue: 'المبيعات الصافية: 125.00 DH',
     parentElement: { closest: () => null }
   };
+  const placeholder = new Map([['placeholder', 'اسم المدير']]);
+  const inputElement = {
+    hasAttribute: name => placeholder.has(name),
+    getAttribute: name => placeholder.get(name),
+    setAttribute: (name, value) => placeholder.set(name, value)
+  };
   const context = {
     document: {
       body: { classList: {
@@ -841,8 +847,33 @@ test('dynamic text prefixes translate and restore without changing their values'
   vm.runInNewContext(handlers, context);
   context.applyLanguage('en');
   assert.equal(textNode.nodeValue, 'Net sales: 125.00 DH');
+  assert.equal(placeholder.get('placeholder'), 'Administrator name');
   context.applyLanguage('fr');
   assert.equal(textNode.nodeValue, 'Ventes nettes: 125.00 DH');
+  assert.equal(placeholder.get('placeholder'), 'Nom de l’administrateur');
   context.applyLanguage('ar');
   assert.equal(textNode.nodeValue, 'المبيعات الصافية: 125.00 DH');
+  assert.equal(placeholder.get('placeholder'), 'اسم المدير');
+});
+
+test('Arabic toast, alert and confirmation messages have English and French translations', () => {
+  const start = html.indexOf('function applyLanguage(lang,save=true){');
+  const end = html.indexOf('function productImageList(', start);
+  const context = { document: {
+    body: { classList: { remove: () => {}, add: () => {} } },
+    documentElement: { lang: 'ar', dir: 'rtl' },
+    createTreeWalker: () => ({ nextNode: () => null }),
+    querySelectorAll: () => [],
+    getElementById: () => null
+  }, NodeFilter: { SHOW_TEXT: 4 }, localStorage: { setItem: () => {}, getItem: () => null } };
+  vm.runInNewContext(html.slice(start, end), context);
+  const dictionary = vm.runInNewContext('extraTranslations', context);
+  const messages = [...html.matchAll(/(?:toast|alert|confirm)\(\s*(['"])([^'"\n]{1,180})\1/g)]
+    .map(match => match[2].trim()).filter(value => /[\\u0600-\\u06FF]/.test(value));
+  const missing = [...new Set(messages.filter(message => !dictionary[message]))];
+  assert.deepEqual(missing, [], 'Every Arabic toast, alert and confirmation needs a translation');
+  for (const [source, pair] of Object.entries(dictionary)) {
+    assert.equal(pair.length, 2, 'Translation pair must contain English and French: ' + source);
+    assert.ok(pair.every(value => typeof value === 'string' && value.length > 0), 'Empty translation: ' + source);
+  }
 });
