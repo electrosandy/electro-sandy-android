@@ -782,3 +782,20 @@ test('Arabic, French and English language selection persists and sets layout dir
   assert.match(html, /<span class="langen">New sale<\\/span>/);
   assert.match(html, /id="langSelect"/);
 });
+
+
+test('expanded translations cover key sales, stock, reports, backup and account screens', () => {
+  assert.match(html, /const extraTranslations=/);
+  for (const phrase of [
+    'المجموع قبل التخفيض',
+    'تأكيد البيع',
+    'تحويل بين المخازن',
+    'التقارير / Rapports',
+    'إغلاق الصندوق اليومي',
+    'حسابات المستخدمين والصلاحيات',
+    'استرجاع نسخة احتياطية JSON'
+  ]) assert.ok(html.includes(phrase), 'Missing source phrase: ' + phrase);
+  assert.match(html, /function translateDocumentText\(\)/);
+  assert.match(html, /translatedTextNodes\.has\(node\)/);
+  assert.match(html, /translateDocumentText\(\);\s*return lang/);
+});
