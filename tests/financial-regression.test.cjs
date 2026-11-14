@@ -23,7 +23,7 @@ function blockFunction(name, nextName) {
   return html.slice(start, close + 1);
 }
 
-function purchaseHarness({ mode = 'partial', paid = 30, method = 'bank', supplier = true } = {}) {
+function purchaseHarness({ mode = 'partial', paid = 30, method = 'bank', supplier = true, offline = false } = {}) {
   const fields = {
     purchaseSupplier: { value: supplier ? '7' : '' },
     purchaseProduct: { value: '3' },
@@ -38,16 +38,18 @@ function purchaseHarness({ mode = 'partial', paid = 30, method = 'bank', supplie
   const purchases = [];
   const cashEntries = [];
   const messages = [];
+  const storage = new Map();
   const context = vm.createContext({
     Math, Number, String, Array, Set, Date,
     document: { getElementById: id => fields[id] || null },
+    navigator: { onLine: !offline },
     products: [product],
     suppliers: supplier ? [{ id: 7, name: 'Test supplier' }] : [],
     purchases,
     cashEntries,
     currentUser: { name: 'Tester' },
     requireRole: () => true,
-    save: () => true,
+    save: () => { storage.set('es13_products', JSON.stringify([product])); storage.set('es13_purchases', JSON.stringify(purchases)); storage.set('es13_cash', JSON.stringify(cashEntries)); return true; },
     toast: message => messages.push(message),
     togglePurchasePayment: () => {},
     renderPurchases: () => {},
@@ -56,7 +58,7 @@ function purchaseHarness({ mode = 'partial', paid = 30, method = 'bank', supplie
   });
   vm.runInContext(oneLineFunction('addPurchase'), context);
   context.addPurchase();
-  return { product, purchases, cashEntries, messages };
+  return { product, purchases, cashEntries, messages, storage };
 }
 
 test('partial supplier purchase updates stock, weighted cost, payable and bank outflow', () => {
@@ -133,7 +135,7 @@ test('financial summary separates original mixed receipts, debt collections, ref
 });
 
 
-function returnHarness({ qty = 1, alreadyReturned = 0 } = {}) {
+function returnHarness({ qty = 1, alreadyReturned = 0, offline = false } = {}) {
   const fields = {
     returnInvoice: { value: '11' },
     returnItem: { value: '0' },
@@ -158,12 +160,14 @@ function returnHarness({ qty = 1, alreadyReturned = 0 } = {}) {
   const returns = [];
   const cashEntries = [];
   const messages = [];
+  const storage = new Map();
   const context = vm.createContext({
     Math, Number, String, Array, Set, Date,
     document: { getElementById: id => fields[id] || null },
+    navigator: { onLine: !offline },
     orders: [order], products: [product], customers: [customer],
     returns, cashEntries, warranties: [],
-    requireRole: () => true, save: () => true,
+    requireRole: () => true, save: () => { storage.set('es13_products', JSON.stringify([product])); storage.set('es13_orders', JSON.stringify([order])); storage.set('es13_customers', JSON.stringify([customer])); storage.set('es13_returns', JSON.stringify(returns)); storage.set('es13_cash', JSON.stringify(cashEntries)); return true; },
     toast: message => messages.push(message),
     renderReturns: () => {}, renderReports: () => {}, renderCash: () => {},
     renderStock: () => {}, renderProducts: () => {}, renderHomeProducts: () => {},
@@ -174,7 +178,7 @@ function returnHarness({ qty = 1, alreadyReturned = 0 } = {}) {
     blockFunction('recordReturn', 'saveSupplier')
   ].join('\n'), context);
   context.recordReturn();
-  return { item, order, product, customer, returns, cashEntries, messages };
+  return { item, order, product, customer, returns, cashEntries, messages, storage };
 }
 
 test('mixed-payment return restores stock, offsets debt and splits the cash refund proportionally', () => {
@@ -206,7 +210,7 @@ test('return exceeding the remaining item quantity is rejected without changing 
 });
 
 
-function checkoutHarness({ cash = 40, bank = 30, redeem = 20 } = {}) {
+function checkoutHarness({ cash = 40, bank = 30, redeem = 20, offline = false } = {}) {
   const fields = {
     saleSource: { value: 'central' }, saleDiscount: { value: '0' },
     payment: { value: 'مختلط / Mixte' }, saleCustomer: { value: '4' },
@@ -215,22 +219,81 @@ function checkoutHarness({ cash = 40, bank = 30, redeem = 20 } = {}) {
   };
   const product = { id: 3, name: 'Test item', price: 100, central: 5, van1: 0, van2: 0, costPrice: 50, costBasisVerified: true, warrantyMonths: 0, serials: [] };
   const customer = { id: 4, name: 'Test customer', phone: '', address: '', loyaltyPoints: 50 };
-  const cart = { 3: 1 }, orders = [], warranties = [], messages = [];
+  const cart = { 3: 1 }, orders = [], warranties = [], messages = [], storage = new Map();
   const context = vm.createContext({
     Math, Number, String, Array, Object, Date,
     document: { getElementById: id => fields[id] || null },
+    navigator: { onLine: !offline },
     products: [product], customers: [customer], cart, orders, warranties,
     sellerProfile: { company: 'ELECTRO Sandy' },
     currentUser: { id: 1, name: 'Tester', role: 'admin' },
-    requireRole: () => true, save: () => true,
+    requireRole: () => true, save: extra => { storage.set('es13_products', JSON.stringify([product])); storage.set('es13_orders', JSON.stringify(orders)); storage.set('es13_customers', JSON.stringify([customer])); storage.set('es13_warranties', JSON.stringify(extra?.[0]?.[1] || warranties)); return true; },
     addCalendarMonths: date => date,
     toggleSalePaymentFields: () => {}, renderCart: () => {}, renderSaleProducts: () => {},
     logActivity: () => {}, toast: message => messages.push(message)
   });
   vm.runInContext(oneLineFunction('checkout'), context);
   context.checkout();
-  return { product, customer, orders, messages, context };
+  return { product, customer, orders, messages, context, storage };
 }
+
+
+function reloadStoredApplication(storage) {
+  const context = vm.createContext({
+    Math, Number, String, Array, Set, Date, JSON,
+    localStorage: {
+      getItem: key => storage.has(key) ? storage.get(key) : null
+    }
+  });
+  const start = html.indexOf('let products=readStoredJSON(');
+  const end = html.indexOf('function logActivity(', start);
+  assert.ok(start >= 0 && end > start, 'Could not locate the application storage initialization block');
+  vm.runInContext(oneLineFunction('readStoredJSON') + '\n' + html.slice(start, end), context);
+  return vm.runInContext('({products, orders, customers, purchases, cashEntries, returns})', context);
+}
+
+test('offline sale is restored by application initialization from local storage', () => {
+  const { product, orders, storage } = checkoutHarness({ offline: true });
+  assert.equal(orders.length, 1);
+  assert.equal(product.central, 4);
+  assert.equal(JSON.parse(storage.get('es13_orders'))[0].total, 98);
+  assert.equal(JSON.parse(storage.get('es13_products'))[0].central, 4);
+  assert.equal(JSON.parse(storage.get('es13_customers'))[0].loyaltyPoints, 37);
+  const reloaded = reloadStoredApplication(storage);
+  assert.equal(reloaded.products[0].central, 4);
+  assert.equal(reloaded.orders.length, 1);
+  assert.equal(reloaded.orders[0].total, 98);
+  assert.equal(reloaded.customers[0].loyaltyPoints, 37);
+});
+
+test('offline purchase is restored by application initialization from local storage', () => {
+  const { product, purchases, storage } = purchaseHarness({ offline: true });
+  assert.equal(purchases.length, 1);
+  assert.equal(product.central, 5);
+  assert.equal(JSON.parse(storage.get('es13_purchases'))[0].balance, 30);
+  assert.equal(JSON.parse(storage.get('es13_products'))[0].central, 5);
+  assert.equal(JSON.parse(storage.get('es13_cash'))[0].amount, 30);
+  const reloaded = reloadStoredApplication(storage);
+  assert.equal(reloaded.products[0].central, 5);
+  assert.equal(reloaded.purchases.length, 1);
+  assert.equal(reloaded.purchases[0].balance, 30);
+  assert.equal(reloaded.cashEntries[0].amount, 30);
+});
+
+test('offline return is restored by application initialization from local storage', () => {
+  const { product, order, returns, storage } = returnHarness({ offline: true });
+  assert.equal(returns.length, 1);
+  assert.equal(product.central, 3);
+  assert.equal(JSON.parse(storage.get('es13_returns')).length, 1);
+  assert.equal(JSON.parse(storage.get('es13_orders'))[0].balance, 0);
+  assert.equal(JSON.parse(storage.get('es13_products'))[0].central, 3);
+  assert.equal(JSON.parse(storage.get('es13_cash')).length, 2);
+  const reloaded = reloadStoredApplication(storage);
+  assert.equal(reloaded.products[0].central, 3);
+  assert.equal(reloaded.returns.length, 1);
+  assert.equal(reloaded.orders[0].balance, 0);
+  assert.equal(reloaded.cashEntries.length, 2);
+});
 
 test('mixed sale applies loyalty redemption and earns points only on the amount paid', () => {
   const { product, customer, orders } = checkoutHarness();
@@ -698,6 +761,7 @@ function backupImportHarness({ backup, failKey = null } = {}) {
     renderPurchases: () => {}, renderCash: () => {}, refresh: () => {}
   });
   vm.runInContext(oneLineFunction('savePreRestoreSafetyBackup'), context);
+  vm.runInContext(oneLineFunction('validBackupArrays'), context);
   vm.runInContext(oneLineFunction('validUserBackup'), context);
   vm.runInContext(blockFunction('importBackup', 'restoreAutoBackup'), context);
   const content = JSON.stringify(backup);
@@ -741,6 +805,108 @@ test('backup import rolls back already-written categories when a storage write f
   assert.equal(context.products[0].id, 1);
   assert.equal(JSON.parse(storage.get('es13_products'))[0].id, 1);
   assert.ok(messages.some(message => message.includes('تعذر الاسترجاع بسبب مساحة التخزين')));
+});
+
+
+test('backup import rejects a malformed optional category instead of silently keeping stale local data', () => {
+  const invalid = validBackupFixture();
+  invalid.data.returns = { id: 100 };
+  const { context, storage, messages } = backupImportHarness({ backup: invalid });
+  assert.equal(context.products[0].id, 1);
+  assert.equal(JSON.parse(storage.get('es13_products'))[0].id, 1);
+  assert.equal(storage.has('es13_auto_backups'), false);
+  assert.ok(messages.some(message => message.includes('أقسام غير صالحة')));
+});
+
+function autoBackupRestoreHarness({ snapshot = validBackupFixture().data, failKey = null } = {}) {
+  const storage = new Map();
+  const old = {
+    products: [{ id: 1, name: 'Local product' }], orders: [{ id: 10 }],
+    customers: [{ id: 11 }], purchases: [{ id: 12 }], cashEntries: [{ id: 13 }],
+    cashClosings: [{ id: 14 }], stockAudits: [{ id: 15 }], activityLog: [{ id: 16 }],
+    warranties: [{ id: 17 }], appUsers: [{ id: 1, name: 'Admin', role: 'admin', active: true, pinHash: 'fallback-a' }],
+    suppliers: [{ id: 18 }], returns: [{ id: 19 }], sellerProfile: { company: 'Local shop' }
+  };
+  const keyMap = {
+    products: 'es13_products', orders: 'es13_orders', customers: 'es13_customers',
+    purchases: 'es13_purchases', cashEntries: 'es13_cash', cashClosings: 'es13_cash_closings',
+    stockAudits: 'es13_stock_audits', activityLog: 'es13_activity_log',
+    warranties: 'es13_warranties', appUsers: 'es13_users', suppliers: 'es13_suppliers',
+    returns: 'es13_returns', sellerProfile: 'es13_seller_profile'
+  };
+  for (const [name, key] of Object.entries(keyMap)) storage.set(key, JSON.stringify(old[name]));
+  storage.set('es13_auto_backups', JSON.stringify([{ createdAt: '2026-11-10T12:00:00.000Z', data: snapshot }]));
+  const localStorage = {
+    getItem: key => storage.has(key) ? storage.get(key) : null,
+    setItem: (key, value) => {
+      if (key === failKey) throw new Error('quota');
+      storage.set(key, String(value));
+    },
+    removeItem: key => storage.delete(key)
+  };
+  const messages = [];
+  const context = vm.createContext({
+    Math, Number, String, Array, Set, Date, JSON, localStorage,
+    products: old.products, orders: old.orders, customers: old.customers,
+    purchases: old.purchases, cashEntries: old.cashEntries, cashClosings: old.cashClosings,
+    stockAudits: old.stockAudits, activityLog: old.activityLog, warranties: old.warranties,
+    appUsers: old.appUsers, suppliers: old.suppliers, returns: old.returns,
+    sellerProfile: old.sellerProfile, currentUser: { id: 1, role: 'admin' }, cart: {},
+    requireRole: () => true, confirm: () => true, toast: message => messages.push(message),
+    renderLogin: () => {}, renderSaleProducts: () => {}, renderCart: () => {},
+    renderProducts: () => {}, renderHomeProducts: () => {}, renderStock: () => {},
+    renderTransfer: () => {}, renderCustomerSelect: () => {}, renderCustomers: () => {},
+    renderReports: () => {}, renderWarranties: () => {}, renderUserAdmin: () => {},
+    renderSuppliers: () => {}, renderReturns: () => {}, renderPurchases: () => {},
+    renderCash: () => {}, refresh: () => {}
+  });
+  for (const name of ['readStoredJSON','savePreRestoreSafetyBackup','validBackupArrays','validUserBackup']) {
+    vm.runInContext(oneLineFunction(name), context);
+  }
+  vm.runInContext(blockFunction('restoreAutoBackup', 'showBackupStatus'), context);
+  context.restoreAutoBackup();
+  return { context, storage, messages, old };
+}
+
+test('automatic backup restore validates and restores every category including product photos', () => {
+  const backup = validBackupFixture().data;
+  backup.products[0].image = 'data:image/jpeg;base64,main-photo';
+  backup.products[0].images = [backup.products[0].image, 'data:image/jpeg;base64,second-photo'];
+  const { context, storage, messages } = autoBackupRestoreHarness({ snapshot: backup });
+  assert.equal(context.products[0].id, 2);
+  assert.deepEqual(Array.from(context.products[0].images), backup.products[0].images);
+  assert.equal(context.orders[0].id, 20);
+  assert.equal(context.customers[0].id, 30);
+  assert.equal(context.purchases[0].id, 40);
+  assert.equal(context.cashEntries[0].id, 50);
+  assert.equal(context.cashClosings[0].date, '2026-11-08');
+  assert.equal(context.stockAudits[0].id, 60);
+  assert.equal(context.activityLog[0].id, 70);
+  assert.equal(context.warranties[0].id, 80);
+  assert.equal(context.appUsers[0].id, 1);
+  assert.equal(context.suppliers[0].id, 90);
+  assert.equal(context.returns[0].id, 100);
+  assert.equal(context.sellerProfile.company, 'Restored shop');
+  assert.equal(JSON.parse(storage.get('es13_returns'))[0].id, 100);
+  assert.ok(messages.includes('تم استرجاع النسخة التلقائية بنجاح'));
+});
+
+test('automatic backup restore rejects a malformed category before changing local data', () => {
+  const backup = validBackupFixture().data;
+  backup.warranties = { id: 80 };
+  const { context, storage, messages } = autoBackupRestoreHarness({ snapshot: backup });
+  assert.equal(context.products[0].id, 1);
+  assert.equal(JSON.parse(storage.get('es13_products'))[0].id, 1);
+  assert.ok(messages.some(message => message.includes('النسخة التلقائية ناقصة أو غير صالحة')));
+});
+
+test('automatic backup restore rolls back local categories when a storage write fails', () => {
+  const { context, storage, messages } = autoBackupRestoreHarness({ failKey: 'es13_orders' });
+  assert.equal(context.products[0].id, 1);
+  assert.equal(context.orders[0].id, 10);
+  assert.equal(JSON.parse(storage.get('es13_products'))[0].id, 1);
+  assert.equal(JSON.parse(storage.get('es13_orders'))[0].id, 10);
+  assert.ok(messages.some(message => message.includes('تم إلغاء العملية')));
 });
 
 test('backup import rejects an incomplete backup without replacing local data', () => {

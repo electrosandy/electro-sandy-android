@@ -13,11 +13,25 @@ import android.webkit.WebResourceRequest;
 import android.webkit.ValueCallback;
 import android.content.Intent;
 import android.net.Uri;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.BitmapFactory;
+import android.graphics.ImageDecoder;
+import android.graphics.Matrix;
+import android.os.Build;
+import androidx.core.content.FileProvider;
+import androidx.exifinterface.media.ExifInterface;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.IOException;
 import android.print.PrintManager;
 import android.print.PrintAttributes;
 import android.content.Context;
 import androidx.fragment.app.FragmentActivity;
 import androidx.biometric.BiometricPrompt;
+import androidx.biometric.BiometricManager;
 import androidx.core.content.ContextCompat;
 import android.speech.RecognizerIntent;
 import java.util.ArrayList;
@@ -76,6 +90,12 @@ public class MainActivity extends FragmentActivity {
                 if (!(activity instanceof MainActivity)) return;
                 MainActivity main = (MainActivity) activity;
                 try {
+                    int biometricAvailability = BiometricManager.from(main).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK);
+                    if (biometricAvailability != BiometricManager.BIOMETRIC_SUCCESS) {
+                        if (main.webView != null) main.webView.evaluateJavascript(
+                            "window.onBiometricError(" + JSONObject.quote("البصمة غير متاحة على هذا الجهاز؛ استعمل رمز PIN.") + ")", null);
+                        return;
+                    }
                     BiometricPrompt prompt = new BiometricPrompt(main, ContextCompat.getMainExecutor(main), new BiometricPrompt.AuthenticationCallback() {
                         @Override public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
                             if (main.webView != null) main.webView.evaluateJavascript("window.onBiometricAuthenticated()", null);
@@ -144,6 +164,23 @@ public class MainActivity extends FragmentActivity {
                 "products","orders","customers","purchases","cashEntries","cashClosings",
                 "stockAudits","sellerProfile","activityLog","warranties","suppliers","returns"
             ).contains(category);
+        }
+        private boolean isValidCloudCategoryPayload(String category, String payload) {
+            try {
+                if ("sellerProfile".equals(category)) {
+                    new org.json.JSONObject(payload);
+                    return true;
+                }
+                if (!isAllowedCloudCategory(category)) return false;
+                org.json.JSONArray array = new org.json.JSONArray(payload);
+                if (array.length() > 100000) return false;
+                for (int i = 0; i < array.length(); i++) {
+                    if (!(array.opt(i) instanceof org.json.JSONObject)) return false;
+                }
+                return true;
+            } catch (Exception invalidPayload) {
+                return false;
+            }
         }
         private boolean isSafeSnapshotId(String snapshotId) {
             return snapshotId != null && snapshotId.matches("[a-z0-9-]{1,64}");
@@ -288,19 +325,33 @@ public class MainActivity extends FragmentActivity {
                                         if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'أجزاء النسخة غير مكتملة',"+JSONObject.quote(snapshotId)+")");
                                         return;
                                     }
-                                    java.util.HashSet<Integer> indexes = new java.util.HashSet<>();
+                                    java.util.TreeMap<Integer,String> verifiedChunks = new java.util.TreeMap<>();
                                     for (QueryDocumentSnapshot chunk : chunks) {
                                         Long indexValue = chunk.getLong("index");
                                         String data = chunk.getString("data");
                                         if (indexValue == null || indexValue < 0 || indexValue >= count || data == null || data.length() > 100000
                                             || !String.format(Locale.US,"%06d",indexValue.intValue()).equals(chunk.getId())
-                                            || !indexes.add(indexValue.intValue())) {
+                                            || verifiedChunks.put(indexValue.intValue(),data) != null) {
                                             if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'جزء غير صالح داخل النسخة',"+JSONObject.quote(snapshotId)+")");
                                             return;
                                         }
                                     }
-                                    if (indexes.size() != count) {
+                                    if (verifiedChunks.size() != count) {
                                         if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'هناك أجزاء ناقصة داخل النسخة',"+JSONObject.quote(snapshotId)+")");
+                                        return;
+                                    }
+                                    StringBuilder categoryPayload = new StringBuilder();
+                                    for (int index = 0; index < count; index++) {
+                                        String chunkData = verifiedChunks.get(index);
+                                        if (chunkData == null) {
+                                            if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'هناك أجزاء ناقصة داخل النسخة',"+JSONObject.quote(snapshotId)+")");
+                                            return;
+                                        }
+                                        categoryPayload.append(chunkData);
+                                    }
+                                    if (!isValidCloudCategoryPayload(category,categoryPayload.toString())) {
+                                        if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudSnapshotCommitted(false,'محتوى قسم غير صالح: '+"
+                                            + JSONObject.quote(category) + ","+JSONObject.quote(snapshotId)+")");
                                         return;
                                     }
                                     if (verifiedCount.incrementAndGet() == categories.size() && !failed.get()) {
@@ -312,35 +363,29 @@ public class MainActivity extends FragmentActivity {
                                         snapshotInfo.put("createdAt", committedAt);
                                         snapshotInfo.put("schemaVersion", 1);
                                         snapshotInfo.put("status", "READY");
-                                        FirebaseFirestore.getInstance().collection("shops").document(uid)
-                                            .collection("snapshots").document(snapshotId).set(snapshotInfo)
-                                            .addOnSuccessListener(snapshotSaved -> {
-                                                Map<String,Object> pointer = new HashMap<>();
-                                                pointer.put("snapshotId", snapshotId);
-                                                pointer.put("categories", categories);
-                                                pointer.put("updatedAt", committedAt);
-                                                com.google.firebase.firestore.DocumentReference pointerRef = FirebaseFirestore.getInstance().collection("shops").document(uid)
-                                                    .collection("snapshotMeta").document("current");
-                                                if (requireBaseMatch) {
-                                                    String expectedBase = expectedBaseId == null ? "" : expectedBaseId;
-                                                    FirebaseFirestore.getInstance().runTransaction(transaction -> {
-                                                        com.google.firebase.firestore.DocumentSnapshot current = transaction.get(pointerRef);
-                                                        String currentId = current.exists() ? current.getString("snapshotId") : "";
-                                                        if (currentId == null) currentId = "";
-                                                        if (!expectedBase.equals(currentId)) return false;
-                                                        transaction.set(pointerRef, pointer);
-                                                        return true;
-                                                    }).addOnSuccessListener(committed -> {
-                                                        if (Boolean.TRUE.equals(committed)) sendCloudJs("window.onCloudSnapshotCommitted(true,'',"+JSONObject.quote(snapshotId)+")");
-                                                        else sendCloudJs("window.onCloudSnapshotCommitted(false,'CLOUD_CONFLICT: النسخة السحابية تغيرت من جهاز آخر',"+JSONObject.quote(snapshotId)+")");
-                                                    }).addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")"));
-                                                } else {
-                                                    pointerRef.set(pointer)
-                                                        .addOnSuccessListener(v -> sendCloudJs("window.onCloudSnapshotCommitted(true,'',"+JSONObject.quote(snapshotId)+")"))
-                                                        .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")"));
-                                                }
-                                            })
-                                            .addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")"));
+                                        com.google.firebase.firestore.DocumentReference snapshotRef = FirebaseFirestore.getInstance().collection("shops").document(uid)
+                                            .collection("snapshots").document(snapshotId);
+                                        Map<String,Object> pointer = new HashMap<>();
+                                        pointer.put("snapshotId", snapshotId);
+                                        pointer.put("categories", categories);
+                                        pointer.put("updatedAt", committedAt);
+                                        com.google.firebase.firestore.DocumentReference pointerRef = FirebaseFirestore.getInstance().collection("shops").document(uid)
+                                            .collection("snapshotMeta").document("current");
+                                        String expectedBase = expectedBaseId == null ? "" : expectedBaseId;
+                                        FirebaseFirestore.getInstance().runTransaction(transaction -> {
+                                            com.google.firebase.firestore.DocumentSnapshot current = transaction.get(pointerRef);
+                                            String currentId = current.exists() ? current.getString("snapshotId") : "";
+                                            if (currentId == null) currentId = "";
+                                            if (requireBaseMatch && !expectedBase.equals(currentId)) return false;
+                                            // Publish the snapshot document and current pointer atomically.
+                                            // A stale client must not leave an orphan READY snapshot behind.
+                                            transaction.set(snapshotRef, snapshotInfo);
+                                            transaction.set(pointerRef, pointer);
+                                            return true;
+                                        }).addOnSuccessListener(committed -> {
+                                            if (Boolean.TRUE.equals(committed)) sendCloudJs("window.onCloudSnapshotCommitted(true,'',"+JSONObject.quote(snapshotId)+")");
+                                            else sendCloudJs("window.onCloudSnapshotCommitted(false,'CLOUD_CONFLICT: النسخة السحابية تغيرت من جهاز آخر',"+JSONObject.quote(snapshotId)+")");
+                                        }).addOnFailureListener(e -> sendCloudJs("window.onCloudSnapshotCommitted(false,"+JSONObject.quote(e.getMessage())+","+JSONObject.quote(snapshotId)+")"));
                                     }
                                 })
                                 .addOnFailureListener(e -> {
@@ -438,7 +483,24 @@ public class MainActivity extends FragmentActivity {
                                             }
                                             sendCloudJs("window.onCloudChunkReceived("+JSONObject.quote(category)+","+index+","+count+","+JSONObject.quote(data)+","+JSONObject.quote(requestId)+")");
                                         }
-                                        if (completed.incrementAndGet() == categories.size() && !failed.get()) sendCloudJs("window.onCloudDownloadComplete(true,"+JSONObject.quote(snapshotId)+","+JSONObject.quote(requestId)+")");
+                                        if (completed.incrementAndGet() == categories.size() && !failed.get()) {
+                                            // Re-check the current pointer after all chunks are downloaded.
+                                            // If another device committed a newer snapshot mid-download,
+                                            // discard these buffers instead of restoring a stale snapshot.
+                                            db.collection("shops").document(uid).collection("snapshotMeta").document("current").get()
+                                                .addOnSuccessListener(latestPointer -> {
+                                                    String latestId = latestPointer.exists() ? latestPointer.getString("snapshotId") : "";
+                                                    if (latestId == null) latestId = "";
+                                                    if (!snapshotId.equals(latestId)) {
+                                                        if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote("تغيرت النسخة السحابية أثناء التنزيل؛ أعد المحاولة للحصول على أحدث نسخة")+","+JSONObject.quote(requestId)+")");
+                                                        return;
+                                                    }
+                                                    if (!failed.get()) sendCloudJs("window.onCloudDownloadComplete(true,"+JSONObject.quote(snapshotId)+","+JSONObject.quote(requestId)+")");
+                                                })
+                                                .addOnFailureListener(e -> {
+                                                    if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+","+JSONObject.quote(requestId)+")");
+                                                });
+                                        }
                                     })
                                     .addOnFailureListener(e -> {
                                         if (failed.compareAndSet(false, true)) sendCloudJs("window.onCloudDownloadError("+JSONObject.quote(e.getMessage())+","+JSONObject.quote(requestId)+")");
@@ -475,6 +537,10 @@ public class MainActivity extends FragmentActivity {
         if (android.os.Build.VERSION.SDK_INT >= 26) webView.getSettings().setSafeBrowsingEnabled(true);
         webView.getSettings().setGeolocationEnabled(false);
         webView.getSettings().setDomStorageEnabled(true);
+        // Force software composition for the app WebView. Some headless Android
+        // emulator GPU stacks report a ready DOM while presenting a white surface.
+        webView.setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null);
+        webView.setBackgroundColor(android.graphics.Color.rgb(9, 19, 33));
         webView.getSettings().setAllowFileAccess(true);
         webView.getSettings().setAllowContentAccess(true);
         webView.getSettings().setAllowFileAccessFromFileURLs(false);
@@ -488,7 +554,7 @@ public class MainActivity extends FragmentActivity {
             @Override public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 Log.i("ELECTRO_SMOKE", "PAGE_FINISHED url=" + url);
-                view.evaluateJavascript("(function(){var b=document.body;var t=document.title||'';var s=document.readyState;var n=b?(b.innerText||'').length:0;if(window.AndroidShare&&AndroidShare.reportPageReady)AndroidShare.reportPageReady(t,s,n);return JSON.stringify({title:t,readyState:s,bodyLength:n,bodyBackground:b?getComputedStyle(b).backgroundColor:''})})()", value ->
+                view.evaluateJavascript("(function(){var b=document.body,g=document.getElementById('authGate'),c=document.getElementById('authContent'),t=document.title||'',s=document.readyState,n=b?(b.innerText||'').length:0;if(window.AndroidShare&&AndroidShare.reportPageReady)AndroidShare.reportPageReady(t,s,n);return JSON.stringify({title:t,readyState:s,bodyLength:n,bodyBackground:b?getComputedStyle(b).backgroundColor:'',authGateDisplay:g?getComputedStyle(g).display:'missing',authContentLength:c?(c.innerText||'').trim().length:0,viewportWidth:window.innerWidth,viewportHeight:window.innerHeight})})()", value ->
                     Log.i("ELECTRO_SMOKE", "DOM_STATE " + value));
             }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
@@ -552,9 +618,12 @@ public class MainActivity extends FragmentActivity {
                 if (fileCallback != null) fileCallback.onReceiveValue(null);
                 fileCallback = callback;
                 try {
-                    Intent intent = params.createIntent();
+                    Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("image/*");
+                    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
                     intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    startActivityForResult(intent, FILE_CHOOSER);
+                    startActivityForResult(Intent.createChooser(intent, "اختيار صور المنتج"), FILE_CHOOSER);
                 } catch (Exception e) {
                     Log.e("ELECTRO_FILES", "Unable to open image picker", e);
                     if (fileCallback != null) fileCallback.onReceiveValue(null);
@@ -625,6 +694,98 @@ public class MainActivity extends FragmentActivity {
         }, "ELECTRO-Sandy-FileSave").start();
     }
 
+
+    // Normalize selected formats natively before WebView reads them.
+    private Uri normalizeProductImage(Uri source, int index) throws Exception {
+        Bitmap bitmap = null;
+        if (Build.VERSION.SDK_INT >= 28) {
+            ImageDecoder.Source imageSource = ImageDecoder.createSource(getContentResolver(), source);
+            bitmap = ImageDecoder.decodeBitmap(imageSource, (decoder, info, src) -> {
+                decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE);
+                int width = info.getSize().getWidth(), height = info.getSize().getHeight();
+                int max = Math.max(width, height);
+                if (max > 2048) {
+                    float scale = 2048f / max;
+                    decoder.setTargetSize(Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale)));
+                }
+            });
+        } else {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            try (InputStream in = getContentResolver().openInputStream(source)) {
+                if (in == null) throw new IOException("تعذر فتح الصورة");
+                BitmapFactory.decodeStream(in, null, bounds);
+            }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new IOException("صيغة الصورة غير مدعومة");
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            int largest = Math.max(bounds.outWidth, bounds.outHeight);
+            while (largest / options.inSampleSize > 2048) options.inSampleSize *= 2;
+            try (InputStream in = getContentResolver().openInputStream(source)) {
+                if (in == null) throw new IOException("تعذر فتح الصورة");
+                bitmap = BitmapFactory.decodeStream(in, null, options);
+            }
+            if (bitmap == null) throw new IOException("تعذر فك ترميز الصورة");
+            try (InputStream in = getContentResolver().openInputStream(source)) {
+                if (in != null) {
+                    int orientation = new ExifInterface(in).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+                    Matrix matrix = new Matrix();
+                    if (orientation == ExifInterface.ORIENTATION_ROTATE_90) matrix.postRotate(90);
+                    else if (orientation == ExifInterface.ORIENTATION_ROTATE_180) matrix.postRotate(180);
+                    else if (orientation == ExifInterface.ORIENTATION_ROTATE_270) matrix.postRotate(270);
+                    else if (orientation == ExifInterface.ORIENTATION_FLIP_HORIZONTAL) matrix.preScale(-1, 1);
+                    else if (orientation == ExifInterface.ORIENTATION_FLIP_VERTICAL) matrix.preScale(1, -1);
+                    if (!matrix.isIdentity()) {
+                        Bitmap rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+                        if (rotated != bitmap) bitmap.recycle();
+                        bitmap = rotated;
+                    }
+                }
+            }
+        }
+        if (bitmap == null || bitmap.getWidth() < 1 || bitmap.getHeight() < 1) throw new IOException("ملف الصورة غير صالح");
+        // JPEG has no alpha channel; composite transparent PNG/WebP pixels on white.
+        Bitmap opaque = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(opaque);
+        canvas.drawColor(Color.WHITE);
+        canvas.drawBitmap(bitmap, 0, 0, null);
+        bitmap.recycle();
+        bitmap = opaque;
+        File directory = new File(getCacheDir(), "product-images");
+        if (!directory.exists() && !directory.mkdirs()) throw new IOException("تعذر إنشاء مساحة مؤقتة للصور");
+        File[] old = directory.listFiles();
+        if (old != null) for (File item : old) if (System.currentTimeMillis() - item.lastModified() > 86400000L) item.delete();
+        File output = new File(directory, "product-" + System.currentTimeMillis() + "-" + index + ".jpg");
+        try (FileOutputStream stream = new FileOutputStream(output)) {
+            if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 88, stream)) throw new IOException("تعذر تحويل الصورة إلى JPEG");
+            stream.flush();
+        } finally {
+            bitmap.recycle();
+        }
+        return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", output);
+    }
+
+    private Uri[] normalizeSelectedImages(Uri[] selected) {
+        if (selected == null || selected.length == 0) return null;
+        if (selected.length > 3) {
+            if (webView != null) webView.post(() -> webView.evaluateJavascript("window.toast && window.toast('الحد الأقصى هو 3 صور لكل منتج')", null));
+            return null;
+        }
+        ArrayList<Uri> normalized = new ArrayList<>();
+        for (int i = 0; i < selected.length; i++) {
+            try {
+                normalized.add(normalizeProductImage(selected[i], i));
+            } catch (Exception error) {
+                Log.e("ELECTRO_IMAGES", "Image conversion failed index=" + i + " uri=" + selected[i], error);
+                if (webView != null) {
+                    String message = "تعذر قراءة إحدى الصور المختارة. جرّب حفظها من جديد ثم أعد الاختيار.";
+                    webView.post(() -> webView.evaluateJavascript("window.toast && window.toast(" + JSONObject.quote(message) + ")", null));
+                }
+                return null;
+            }
+        }
+        return normalized.toArray(new Uri[0]);
+    }
+
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == FILE_SAVE) {
@@ -663,6 +824,7 @@ public class MainActivity extends FragmentActivity {
                 if ((result == null || result.length == 0) && data.getData() != null) result = new Uri[]{data.getData()};
             }
             Log.i("ELECTRO_FILES", "Image picker resultCode=" + resultCode + " selected=" + (result == null ? 0 : result.length));
+            if (result != null && result.length > 0) result = normalizeSelectedImages(result);
             ValueCallback<Uri[]> callback = fileCallback;
             fileCallback = null;
             callback.onReceiveValue(result);
