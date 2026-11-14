@@ -819,6 +819,7 @@ test('expanded translations cover key sales, stock, reports, backup and account 
   assert.match(html, /function translateDocumentText\(\)/);
   assert.match(html, /attributeNames=\['placeholder','title','aria-label','alt'\]/);
   assert.match(html, /const translatedAttributes=new WeakMap\(\)/);
+  assert.match(html, /attributes:true,attributeFilter:\['placeholder','title','aria-label','alt'\]/);
   assert.match(html, /translatedTextNodes\.has\(node\)/);
   assert.match(html, /translateDocumentText\(\);\s*return lang/);
 });
