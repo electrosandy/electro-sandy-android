@@ -23,6 +23,13 @@ The current application source already contains implementations or UI flows for:
 
 These are code-level observations, not proof that every screen or flow is bug-free. Each item must be covered by behavior tests and device checks.
 
+## Implemented on this branch
+- Added a dedicated optional internal SKU field, separate from the barcode.
+- SKU values are trimmed and compared case-insensitively; duplicate references are rejected while editing the same product remains valid.
+- SKU is preserved on create/edit, included in product search and displayed in the product list.
+- Added Arabic, English and French translations for the new field and duplicate-SKU validation.
+- Added regression tests and included them in the GitHub Actions test command.
+
 ## Feature work still required
 
 ### P0 — Data safety and reliability
