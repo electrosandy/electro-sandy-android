@@ -34,6 +34,7 @@ test('home quick scan matches SKU and archived products are excluded from home s
   const fields = { homeProductSearch: { value: 'CHG-USB-01' } };
   const calls = [];
   const context = {
+    requireRole: () => true,
     products: [{ id: 5, name: 'USB charger', sku: 'CHG-USB-01', barcode: '12345' }],
     document: { getElementById: id => fields[id] || null },
     homeProductQty: {},
