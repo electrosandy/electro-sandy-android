@@ -837,6 +837,10 @@ test('dynamic text prefixes translate and restore without changing their values'
     nodeValue: 'المبيعات الصافية: 125.00 DH',
     parentElement: { closest: () => null }
   };
+  const countNode = {
+    nodeValue: '0 عملية اليوم',
+    parentElement: { closest: () => null }
+  };
   const placeholder = new Map([['placeholder', 'اسم المدير']]);
   const inputElement = {
     hasAttribute: name => placeholder.has(name),
@@ -857,8 +861,9 @@ test('dynamic text prefixes translate and restore without changing their values'
       }},
       documentElement: root,
       createTreeWalker: () => {
-        let used = false;
-        return { nextNode: () => used ? null : (used = true, textNode) };
+        let index = 0;
+        const nodes = [textNode, countNode];
+        return { nextNode: () => nodes[index++] || null };
       },
       querySelectorAll: () => [inputElement, imageElement],
       getElementById: id => id === 'langSelect' ? selector : null
@@ -872,14 +877,17 @@ test('dynamic text prefixes translate and restore without changing their values'
   vm.runInNewContext(handlers, context);
   context.applyLanguage('en');
   assert.equal(textNode.nodeValue, 'Net sales: 125.00 DH');
+  assert.equal(countNode.nodeValue, '0 operations today');
   assert.equal(placeholder.get('placeholder'), 'Administrator name');
   assert.equal(imageAlt.get('alt'), 'Photo 2');
   context.applyLanguage('fr');
   assert.equal(textNode.nodeValue, 'Ventes nettes: 125.00 DH');
+  assert.equal(countNode.nodeValue, '0 opérations aujourd’hui');
   assert.equal(placeholder.get('placeholder'), 'Nom de l’administrateur');
   assert.equal(imageAlt.get('alt'), 'Photo 2');
   context.applyLanguage('ar');
   assert.equal(textNode.nodeValue, 'المبيعات الصافية: 125.00 DH');
+  assert.equal(countNode.nodeValue, '0 عملية اليوم');
   assert.equal(placeholder.get('placeholder'), 'اسم المدير');
   assert.equal(imageAlt.get('alt'), 'صورة 2');
 });
