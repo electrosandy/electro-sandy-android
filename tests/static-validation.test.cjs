@@ -804,3 +804,45 @@ test('expanded translations cover key sales, stock, reports, backup and account 
   assert.match(html, /translatedTextNodes\.has\(node\)/);
   assert.match(html, /translateDocumentText\(\);\s*return lang/);
 });
+
+
+test('dynamic text prefixes translate and restore without changing their values', () => {
+  const start = html.indexOf('function applyLanguage(lang,save=true){');
+  const end = html.indexOf('function productImageList(', start);
+  const handlers = html.slice(start, end);
+  const classes = new Set();
+  const root = { lang: 'ar', dir: 'rtl' };
+  const selector = { value: 'ar' };
+  const values = new Map();
+  const textNode = {
+    nodeValue: 'المبيعات الصافية: 125.00 DH',
+    parentElement: { closest: () => null }
+  };
+  const context = {
+    document: {
+      body: { classList: {
+        remove: (...items) => items.forEach(x => classes.delete(x)),
+        add: item => classes.add(item)
+      }},
+      documentElement: root,
+      createTreeWalker: () => {
+        let used = false;
+        return { nextNode: () => used ? null : (used = true, textNode) };
+      },
+      querySelectorAll: () => [],
+      getElementById: id => id === 'langSelect' ? selector : null
+    },
+    NodeFilter: { SHOW_TEXT: 4 },
+    localStorage: {
+      setItem: (key, value) => values.set(key, value),
+      getItem: key => values.get(key) || null
+    }
+  };
+  vm.runInNewContext(handlers, context);
+  context.applyLanguage('en');
+  assert.equal(textNode.nodeValue, 'Net sales: 125.00 DH');
+  context.applyLanguage('fr');
+  assert.equal(textNode.nodeValue, 'Ventes nettes: 125.00 DH');
+  context.applyLanguage('ar');
+  assert.equal(textNode.nodeValue, 'المبيعات الصافية: 125.00 DH');
+});
