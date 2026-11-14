@@ -781,6 +781,24 @@ test('Arabic, French and English language selection persists and sets layout dir
   context.applyLanguage('invalid');
   assert.equal(root.lang, 'ar');
   assert.equal(selector.value, 'ar');
+  const restoredRoot = { lang: 'ar', dir: 'rtl' };
+  const restoredSelector = { value: 'ar' };
+  const restoredContext = {
+    document: {
+      body: { classList: { remove: () => {}, add: () => {} } },
+      documentElement: restoredRoot,
+      createTreeWalker: () => ({ nextNode: () => null }),
+      querySelectorAll: () => [],
+      getElementById: id => id === 'langSelect' ? restoredSelector : null
+    },
+    NodeFilter: { SHOW_TEXT: 4 },
+    localStorage: { getItem: key => key === 'es13_language' ? 'en' : null, setItem: () => {} }
+  };
+  vm.runInNewContext(handlers, restoredContext);
+  restoredContext.initLanguage();
+  assert.equal(restoredRoot.lang, 'en');
+  assert.equal(restoredRoot.dir, 'ltr');
+  assert.equal(restoredSelector.value, 'en');
   assert.match(html, /<span class="langen">Quick actions<\\/span>/);
   assert.match(html, /<span class="langen">New sale<\\/span>/);
   assert.match(html, /id="langSelect"/);
