@@ -478,11 +478,153 @@ function applyLanguage(lang,save=true){
  document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';
  const selector=document.getElementById('langSelect');if(selector)selector.value=lang;
  if(save){try{localStorage.setItem('es13_language',lang)}catch(e){}}
+ if(typeof translateDocumentText==='function')translateDocumentText();
  return lang
 }
+const extraTranslations={
+"تغيير المظهر":["Change theme","Changer le thème"],
+"بحث بالاسم أو Barcode / QR":["Search by name or Barcode / QR","Rechercher par nom ou code-barres / QR"],
+"يمكن استعمال قارئ باركود خارجي أو كاميرا الجهاز.":["You can use an external barcode scanner or the device camera.","Vous pouvez utiliser un lecteur de codes-barres externe ou l’appareil photo."],
+"لوحة القيادة":["Dashboard","Tableau de bord"],
+"رسم بياني للمبيعات خلال آخر سبعة أيام":["Sales chart for the last seven days","Graphique des ventes des sept derniers jours"],
+"لا توجد عمليات بعد. جرّب تسجيل عملية بيع.":["No activity yet. Try recording a sale.","Aucune activité pour le moment. Essayez d’enregistrer une vente."],
+"البيانات محفوظة محلياً على هذا الجهاز. لا توجد مزامنة سحابية حالياً؛ صدّر نسخة JSON بانتظام قبل تغيير الجهاز أو حذف التطبيق.":["Data is stored locally on this device. Cloud sync is not currently connected; export a JSON backup regularly before changing devices or uninstalling the app.","Les données sont enregistrées localement sur cet appareil. La synchronisation cloud n’est pas connectée ; exportez régulièrement une sauvegarde JSON avant de changer d’appareil ou de désinstaller l’application."],
+"بحث بالاسم أو الباركود":["Search by name or barcode","Rechercher par nom ou code-barres"],
+"منتج":["Product","Produit"],
+"المجموع قبل التخفيض":["Subtotal before discount","Sous-total avant remise"],
+"التخفيض (%)":["Discount (%)","Remise (%)"],
+"قيمة التخفيض":["Discount amount","Montant de la remise"],
+"خصم نقاط الوفاء":["Loyalty points discount","Remise des points de fidélité"],
+"نقاط الوفاء المستعملة (10 نقاط = 1 DH)":["Loyalty points used (10 points = 1 DH)","Points de fidélité utilisés (10 points = 1 DH)"],
+"اختار زبوناً مسجلاً لاستعمال النقاط":["Select a registered customer to use points","Sélectionnez un client enregistré pour utiliser ses points"],
+"المبلغ نقداً (DH)":["Cash amount (DH)","Montant en espèces (DH)"],
+"المبلغ عبر البنك (DH)":["Bank transfer amount (DH)","Montant par banque (DH)"],
+"مجموع المبلغين لا يمكن أن يتجاوز مجموع الفاتورة؛ المتبقي يسجل كدين.":["The two amounts cannot exceed the invoice total; any remainder is recorded as debt.","La somme des deux montants ne peut pas dépasser le total de la facture ; le solde restant est enregistré comme dette."],
+"كل تحويل كينقص الكمية من المصدر وكيزيدها فالوجهة. العملية كتتسجل فالسجل.":["Each transfer decreases stock at the source and increases it at the destination. The operation is recorded in the log.","Chaque transfert diminue le stock à la source et l’augmente à destination. L’opération est enregistrée dans le journal."],
+"لوحة الأداء مبنية على حسابات المستخدمين بدور بائع. المبيعات القديمة التي لا تتوفر على نسبة مندوب ستظهر منفصلة.":["Performance is based on user accounts with the seller role. Older sales without a seller assignment are shown separately.","Les performances sont calculées à partir des comptes ayant le rôle vendeur. Les anciennes ventes sans vendeur attribué sont affichées séparément."],
+"المخزون والديون والضمانات والموردون":["Stock, debts, warranties and suppliers","Stock, dettes, garanties et fournisseurs"],
+"فواتير الزبناء وتفاصيل الطلبات":["Customer invoices and order details","Factures clients et détails des commandes"],
+"الموردون والتوريد":["Suppliers and purchasing","Fournisseurs et approvisionnement"],
+"المقبوضات والمصاريف":["Receipts and expenses","Encaissements et dépenses"],
+"المبيعات والأرباح":["Sales and profits","Ventes et bénéfices"],
+"اللغة والنسخ الاحتياطي":["Language and backup","Langue et sauvegarde"],
+"مقارنة الكميات الفعلية بالمسجلة":["Compare physical and recorded quantities","Comparer les quantités physiques et enregistrées"],
+"تتبع المبيعات والمشتريات والتحويلات والتغييرات":["Track sales, purchases, transfers and changes","Suivre les ventes, achats, transferts et modifications"],
+"تسجيل إرجاع المنتجات وتحديث المخزون والحسابات":["Record product returns and update stock and accounts","Enregistrer les retours et mettre à jour le stock et les comptes"],
+"بيانات الموردين وسجل التوريد":["Supplier details and purchase history","Coordonnées des fournisseurs et historique des achats"],
+"تتبع الأجهزة المباعة وتواريخ انتهاء الضمان":["Track sold devices and warranty expiry dates","Suivre les appareils vendus et les dates d’expiration de garantie"],
+"المنتجات والمبيعات والمشتريات والضمان":["Products, sales, purchases and warranties","Produits, ventes, achats et garanties"],
+"التنبيهات الحالية":["Current alerts","Alertes actuelles"],
+"آخر 1000 عملية مسجلة على هذا الجهاز":["Last 1,000 operations recorded on this device","Les 1 000 dernières opérations enregistrées sur cet appareil"],
+"كل فاتورة كتحتافظ بمعلومات الطلب والزبون وقت البيع.":["Each invoice keeps the order and customer details from the time of sale.","Chaque facture conserve les informations de la commande et du client au moment de la vente."],
+"يمكنك إضافة منتج جديد وتحميل صورته مباشرة من هنا.":["You can add a new product and upload its photo directly here.","Vous pouvez ajouter un produit et importer sa photo directement ici."],
+"يمكنك إضافة المورد من صفحة الموردين.":["You can add the supplier from the Suppliers page.","Vous pouvez ajouter le fournisseur depuis la page Fournisseurs."],
+"طريقة تسوية الشراء":["Purchase settlement method","Mode de règlement de l’achat"],
+"مؤدى بالكامل":["Paid in full","Payé intégralement"],
+"أداء جزئي":["Partially paid","Partiellement payé"],
+"بالدين — غير مؤدى":["On credit — unpaid","À crédit — non payé"],
+"وسيلة الأداء":["Payment method","Mode de paiement"],
+"المبلغ المؤدى الآن (DH)":["Amount paid now (DH)","Montant payé maintenant (DH)"],
+"تسجيل المشتريات وإضافة للمخزون المركزي":["Record purchase and add to central stock","Enregistrer l’achat et ajouter au stock central"],
+"لا توجد مشتريات مسجلة":["No purchases recorded","Aucun achat enregistré"],
+"نوع العملية":["Transaction type","Type d’opération"],
+"مداخيل":["Income","Recettes"],
+"مصاريف":["Expenses","Dépenses"],
+"الحساب":["Account","Compte"],
+"البيان":["Description","Libellé"],
+"حفظ العملية":["Save transaction","Enregistrer l’opération"],
+"تقرير حسب الفترة":["Report by period","Rapport par période"],
+"من تاريخ":["From date","Du"],
+"إلى تاريخ":["To date","Au"],
+"إجمالي المبيعات":["Total sales","Total des ventes"],
+"عدد الطلبات":["Number of orders","Nombre de commandes"],
+"قيمة المخزون":["Inventory value","Valeur du stock"],
+"عدد الزبناء":["Number of customers","Nombre de clients"],
+"تكلفة البضاعة المباعة (المعروفة)":["Cost of goods sold (known)","Coût des marchandises vendues (connu)"],
+"صافي الربح المحسوب بعد المصاريف":["Net profit after expenses","Bénéfice net après dépenses"],
+"المصاريف المسجلة":["Recorded expenses","Dépenses enregistrées"],
+"رصيد الصندوق المسجل":["Recorded cash balance","Solde de caisse enregistré"],
+"رصيد البنك المسجل":["Recorded bank balance","Solde bancaire enregistré"],
+"ديون الزبناء المتبقية":["Outstanding customer debts","Dettes clients restantes"],
+"تتبع الديون وأداء الأقساط":["Track debts and installment payments","Suivi des dettes et des paiements échelonnés"],
+"ملخص مالي":["Financial summary","Résumé financier"],
+"إغلاق الصندوق اليومي":["Daily cash closing","Clôture journalière de caisse"],
+"الرصيد النقدي الفعلي (DH)":["Actual cash balance (DH)","Solde réel en espèces (DH)"],
+"أدخل المبلغ الموجود بالصندوق":["Enter the amount in the cash register","Saisissez le montant présent dans la caisse"],
+"حساب وحفظ الإغلاق":["Calculate and save closing","Calculer et enregistrer la clôture"],
+"حفظ الجرد وتحديث المخزون":["Save stock count and update inventory","Enregistrer l’inventaire et mettre à jour le stock"],
+"اسم الشركة / المحل":["Company / store name","Nom de l’entreprise / magasin"],
+"اسم البائع":["Seller name","Nom du vendeur"],
+"اسم المسؤول أو البائع":["Manager or seller name","Nom du responsable ou du vendeur"],
+"حفظ معلومات البائع والشركة":["Save seller and company details","Enregistrer les informations du vendeur et de l’entreprise"],
+"سجّل الدخول بحساب Firebase. يمكن تفعيل المزامنة التلقائية بعد أول رفع أو استعادة. أثناء فتح التطبيق، تُرفع التغييرات بعد توقفها وتُستقبل النسخة الأحدث إذا لم توجد تعديلات محلية غير مرفوعة. عند التعارض يتوقف التحديث لحماية البيانات.":["Sign in with your Firebase account. Automatic sync can be enabled after the first upload or restore. While the app is open, changes upload after editing stops and the latest version is received when there are no pending local changes. Sync pauses on conflict to protect data.","Connectez-vous avec votre compte Firebase. La synchronisation automatique peut être activée après le premier envoi ou la première restauration. Lorsque l’application est ouverte, les modifications sont envoyées après une pause et la version la plus récente est reçue en l’absence de modifications locales en attente. La synchronisation s’interrompt en cas de conflit pour protéger les données."],
+"البريد الإلكتروني لحساب المزامنة":["Sync account email","E-mail du compte de synchronisation"],
+"تسجيل الدخول إلى السحابة":["Sign in to cloud","Se connecter au cloud"],
+"غير متصل بالسحابة":["Not connected to cloud","Non connecté au cloud"],
+"تفعيل النسخ التلقائي الآمن بعد التعديلات":["Enable safe automatic backup after changes","Activer la sauvegarde automatique sécurisée après modification"],
+"رفع بيانات هذا الجهاز إلى السحابة":["Upload this device's data to cloud","Envoyer les données de cet appareil vers le cloud"],
+"استرجاع البيانات من السحابة إلى هذا الجهاز":["Restore data from cloud to this device","Restaurer les données du cloud sur cet appareil"],
+"تسجيل الخروج من السحابة":["Sign out of cloud","Se déconnecter du cloud"],
+"تفعيل / إيقاف الدخول بالبصمة":["Enable / disable fingerprint login","Activer / désactiver la connexion par empreinte"],
+"ضبط القفل التلقائي بعد الخمول":["Set automatic lock after inactivity","Régler le verrouillage automatique après inactivité"],
+"قفل التطبيق الآن":["Lock app now","Verrouiller l’application maintenant"],
+"تصدير نسخة احتياطية":["Export backup","Exporter une sauvegarde"],
+"استرجاع آخر نسخة تلقائية":["Restore latest automatic backup","Restaurer la dernière sauvegarde automatique"],
+"استرجاع نسخة احتياطية JSON":["Restore JSON backup","Restaurer une sauvegarde JSON"],
+"حالة حفظ البيانات":["Data storage status","État de l’enregistrement des données"],
+"حسابات المستخدمين والصلاحيات":["User accounts and permissions","Comptes utilisateurs et autorisations"],
+"اسم المستخدم":["Username","Nom d’utilisateur"],
+"الدور":["Role","Rôle"],
+"إضافة مستخدم":["Add user","Ajouter un utilisateur"],
+"تغيير رمز PIN ديالي":["Change my PIN","Modifier mon code PIN"],
+"تسجيل الخروج":["Log out","Se déconnecter"],
+"إخفاء شريط التنقل":["Hide navigation bar","Masquer la barre de navigation"],
+"إضافة منتج جديد":["Add new product","Ajouter un nouveau produit"],
+"التصنيف":["Category","Catégorie"],
+"صور المنتج (اختياري، حتى 3 صور)":["Product photos (optional, up to 3)","Photos du produit (facultatif, jusqu’à 3)"],
+"يمكنك اختيار حتى 3 صور. الصور القديمة تبقى محفوظة عند تعديل المنتج.":["You can select up to 3 photos. Existing photos remain saved when editing a product.","Vous pouvez sélectionner jusqu’à 3 photos. Les anciennes photos sont conservées lors de la modification du produit."],
+"الكمية الأولية":["Initial quantity","Quantité initiale"],
+"مدة الضمان بالأشهر":["Warranty period in months","Durée de garantie en mois"],
+"حد تنبيه نقص المخزون":["Low-stock alert threshold","Seuil d’alerte de stock faible"],
+"حفظ المنتج":["Save product","Enregistrer le produit"],
+"اسم الزبون":["Customer name","Nom du client"],
+"الاسم الكامل أو اسم المحل":["Full name or store name","Nom complet ou nom du magasin"],
+"المدينة / العنوان":["City / address","Ville / adresse"],
+"حفظ الزبون":["Save customer","Enregistrer le client"],
+"إنشاء حساب المدير الأول لحماية الدخول وتحديد صلاحيات المستخدمين.":["Create the first administrator account to protect access and manage user permissions.","Créez le premier compte administrateur pour sécuriser l’accès et gérer les autorisations des utilisateurs."],
+"إنشاء حساب المدير":["Create administrator account","Créer le compte administrateur"],
+"تسجيل الدخول":["Sign in","Se connecter"],
+"دخول بالبصمة":["Sign in with fingerprint","Se connecter avec l’empreinte"],
+"رمز PIN غير صحيح":["Incorrect PIN","Code PIN incorrect"],
+"ليست لديك صلاحية تنفيذ هذه العملية":["You are not authorized to perform this action","Vous n’êtes pas autorisé à effectuer cette opération"],
+"لا يوجد مستخدمون":["No users","Aucun utilisateur"],
+"تمت إضافة المستخدم":["User added","Utilisateur ajouté"],
+"تعذر حفظ البيانات بسبب مساحة التخزين؛ تمت إعادة البيانات إلى آخر نسخة محفوظة":["Could not save data because storage is full; data was restored to the last saved version","Impossible d’enregistrer les données car l’espace de stockage est insuffisant ; les données ont été restaurées à la dernière version enregistrée"]
+};
+const translatedTextNodes=new WeakMap();
+function translateDocumentText(){
+ const lang=document.documentElement.lang||'ar';
+ if(lang==='ar')return;
+ const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+ let node;
+ while((node=walker.nextNode())){
+  if(node.parentElement&&node.parentElement.closest('.langar,.langfr,.langen,script,style'))continue;
+  const original=translatedTextNodes.get(node)||node.nodeValue;
+  const pair=extraTranslations[original.trim()];
+  if(!pair)continue;
+  translatedTextNodes.set(node,original);
+  node.nodeValue=original.replace(original.trim(),pair[lang==='en'?0:1]);
+ }
+}
+let languageObserver=null;
 function initLanguage(){
  let saved='ar';try{saved=localStorage.getItem('es13_language')||'ar'}catch(e){}
- applyLanguage(saved,false)
+ applyLanguage(saved,false);
+ translateDocumentText();
+ if(!languageObserver&&typeof MutationObserver!=='undefined'){
+  languageObserver=new MutationObserver(()=>translateDocumentText());
+  languageObserver.observe(document.body,{childList:true,subtree:true,characterData:true});
+ }
 }
 function productImageList(p){if(!p||typeof p!=='object')return[];let list=Array.isArray(p.images)?p.images.slice():[];if(p.image&&!list.includes(p.image))list.unshift(p.image);return list.filter(x=>typeof x==='string'&&x.startsWith('data:image/')).slice(0,3)}
 function art(p){let image=productImageList(p)[0];if(image)return `<div class="product-thumb"><img src="${statementEscape(image)}" alt="${statementEscape(p.name)}"></div>`;let n=String(p.name||'').toLowerCase(),e=n.includes('câble')||n.includes('hdmi')?'🔌':n.includes('écouteur')?'🎧':n.includes('souris')?'🖱️':n.includes('multiprise')?'🔋':'🔌';return `<div class="product-thumb">${e}</div>`}
