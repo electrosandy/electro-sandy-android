@@ -36,6 +36,7 @@ These are code-level observations, not proof that every screen or flow is bug-fr
 - Stock transfers now create durable movement-ledger entries in the existing stock-audit dataset, including source/destination, quantity, actor, timestamp and moved serial numbers; the stock history displays these entries alongside stocktakes.
 - Archived products are blocked from stock transfers, and insufficient serial-number inventory is rejected before movement.
 - Added automated transfer-ledger and serial-movement regression tests.
+- Camera and home quick-scan now resolve either barcode or internal SKU, while archived products stay out of home-sale search; regression tests cover both scan paths.
 
 ## Feature work still required
 
