@@ -918,7 +918,8 @@ test('native alert and confirmation dialogs are translated to the selected langu
   const shown = [];
   const nativeWindow = {
     alert: message => shown.push(['alert', message]),
-    confirm: message => { shown.push(['confirm', message]); return true; }
+    confirm: message => { shown.push(['confirm', message]); return true; },
+    prompt: (message, value) => { shown.push(['prompt', message, value]); return 'updated'; }
   };
   const context = {
     window: nativeWindow,
@@ -941,4 +942,7 @@ test('native alert and confirmation dialogs are translated to the selected langu
   context.applyLanguage('fr');
   nativeWindow.alert('تم تسجيل البيع بنجاح');
   assert.equal(shown[2][1], 'Vente enregistrée avec succès');
+  assert.equal(nativeWindow.prompt('تعديل المبلغ بالدرهم', '50'), 'updated');
+  assert.equal(shown[3][1], 'Modifier le montant en dirhams');
+  assert.equal(shown[3][2], '50');
 });
