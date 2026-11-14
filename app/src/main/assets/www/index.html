@@ -609,6 +609,19 @@ Object.assign(extraTranslations,{"أدخل الاسم ورمز PIN من 4 إلى
 
 Object.assign(extraTranslations,{"بحث / Recherche":["Search","Rechercher"],"بحث عن زبون / Rechercher":["Search for a customer","Rechercher un client"],"عيب، تبديل، إلغاء...":["Defect, exchange, cancellation...","Défaut, échange, annulation..."],"اسم المورد أو الشركة":["Supplier or company name","Nom du fournisseur ou de l’entreprise"],"رقم الهاتف":["Phone number","Numéro de téléphone"],"المدينة والعنوان":["City and address","Ville et adresse"],"بحث برقم الجهاز أو الفاتورة":["Search by device or invoice number","Rechercher par appareil ou numéro de facture"],"مثال: مصاريف النقل":["Example: transport expenses","Exemple : frais de transport"],"أدخل المبلغ الموجود بالصندوق":["Enter the cash in the register","Saisissez le montant présent dans la caisse"],"اسم المسؤول أو البائع":["Manager or seller name","Nom du responsable ou du vendeur"],"كلمة مرور Firebase":["Firebase password","Mot de passe Firebase"],"إخفاء شريط التنقل":["Hide navigation bar","Masquer la barre de navigation"],"مثال: Chargeur USB-C":["Example: USB-C charger","Exemple : chargeur USB-C"],"إلكترونيات، كابلات...":["Electronics, cables...","Électronique, câbles..."],"رقم المنتج":["Product number","Numéro du produit"],"الاسم الكامل أو اسم المحل":["Full name or store name","Nom complet ou nom du magasin"],"الدار البيضاء":["Casablanca","Casablanca"],"اسم المدير":["Administrator name","Nom de l’administrateur"],"رمز PIN من 4 أرقام على الأقل":["PIN with at least 4 digits","Code PIN d’au moins 4 chiffres"],"رمز PIN":["PIN","Code PIN"],"رقم في كل سطر":["One per line","Un par ligne"],"نقص الكمية":["Decrease quantity","Diminuer la quantité"],"زيد الكمية":["Increase quantity","Augmenter la quantité"],"حذف الصورة":["Delete photo","Supprimer la photo"],"معاينة الصورة ":["Image preview ","Aperçu de l’image "]});
 Object.assign(extraTranslations,{"صورة ":["Photo ","Photo "]});
+function translateMessage(message){
+ const original=String(message??'');
+ const lang=document.documentElement.lang||'ar';
+ if(lang==='ar')return original;
+ const trimmed=original.trim();
+ const matchKey=extraTranslations[trimmed]?trimmed:Object.keys(extraTranslations).filter(key=>key.length>=4&&trimmed.startsWith(key)).sort((x,y)=>y.length-x.length)[0];
+ const pair=matchKey?extraTranslations[matchKey]:null;
+ return pair?original.replace(matchKey,pair[lang==='en'?0:1]):original;
+}
+const nativeAlert=typeof window.alert==='function'?window.alert.bind(window):null;
+const nativeConfirm=typeof window.confirm==='function'?window.confirm.bind(window):null;
+if(nativeAlert)window.alert=message=>nativeAlert(translateMessage(message));
+if(nativeConfirm)window.confirm=message=>nativeConfirm(translateMessage(message));
 const translatedTextNodes=new WeakMap();
 const translatedAttributes=new WeakMap();
 function translateDocumentText(){
