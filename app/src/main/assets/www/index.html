@@ -614,7 +614,8 @@ function translateDocumentText(){
   const pair=extraTranslations[original.trim()];
   if(!pair)continue;
   translatedTextNodes.set(node,original);
-  node.nodeValue=original.replace(original.trim(),pair[lang==='en'?0:1]);
+  const translated=original.replace(original.trim(),pair[lang==='en'?0:1]);
+  if(node.nodeValue!==translated)node.nodeValue=translated;
  }
  const attributeNames=['placeholder','title','aria-label','alt'];
  document.querySelectorAll('[placeholder],[title],[aria-label],[alt]').forEach(element=>{
@@ -629,7 +630,7 @@ function translateDocumentText(){
    }
    const original=originals.has(name)?originals.get(name):current;
    const pair=extraTranslations[original.trim()];
-   if(pair){originals.set(name,original);element.setAttribute(name,original.replace(original.trim(),pair[lang==='en'?0:1]));}
+   if(pair){originals.set(name,original);const translated=original.replace(original.trim(),pair[lang==='en'?0:1]);if(current!==translated)element.setAttribute(name,translated);}
   });
  });
 }
