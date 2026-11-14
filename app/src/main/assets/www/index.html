@@ -248,6 +248,30 @@ body.bottom-nav-hidden .bottom-nav-toggle .nav-toggle-icon{transform:rotate(180d
 body.bottom-nav-hidden .bottom-nav-toggle .nav-toggle-label{display:none}
 @media(min-width:650px){.bottom-nav-toggle{bottom:94px}body.bottom-nav-hidden .bottom-nav-toggle{bottom:14px}}
 
+/* ELECTRO Sandy branded launch screen */
+#electroLaunchSplash{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:22px;background:radial-gradient(ellipse at 50% 38%,#1789ef 0%,#0750b7 36%,#061b4c 76%,#020d2b 100%);color:#fff;opacity:1;visibility:visible;transition:opacity .45s ease,visibility .45s ease;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+#electroLaunchSplash:before,#electroLaunchSplash:after{content:"";position:absolute;pointer-events:none;left:-22%;width:145%;height:23%;border:12px solid #ff9b12;border-left-color:transparent;border-right-color:transparent;transform:rotate(-12deg);filter:drop-shadow(0 0 12px #ff9b12)}
+#electroLaunchSplash:before{top:5%;border-bottom:0;border-radius:50%}
+#electroLaunchSplash:after{bottom:1%;border-top:0;border-radius:50%}
+#electroLaunchSplash .es-splash-card{position:relative;z-index:1;width:min(100%,520px);max-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:clamp(9px,2vh,20px)}
+#electroLaunchSplash .es-splash-mark{width:clamp(82px,19vw,132px);aspect-ratio:1;border:4px solid #ffd15a;border-radius:27%;background:linear-gradient(145deg,#fff 0%,#d8eaff 18%,#08265f 46%,#031337 100%);box-shadow:0 0 0 5px #f18b10,0 8px 30px #00102c;display:grid;place-items:center;color:#ffb21d;font-size:clamp(38px,9vw,62px);font-weight:1000;letter-spacing:-5px;text-shadow:2px 3px 0 #061b4c}
+#electroLaunchSplash .es-splash-mark span{color:#fff}
+#electroLaunchSplash .es-splash-title{font-size:clamp(30px,8vw,54px);font-weight:1000;line-height:1.02;letter-spacing:-1.5px;text-shadow:0 4px 0 #03143d,0 8px 20px #00102c}
+#electroLaunchSplash .es-splash-title em{font-style:normal;color:#ff9b13}
+#electroLaunchSplash .es-splash-ar{font-size:clamp(19px,5vw,29px);font-weight:900;color:#ffcf35;text-shadow:0 3px 0 #03143d}
+#electroLaunchSplash .es-splash-tag{background:#ffc21b;color:#071b42;border-radius:999px;padding:8px 18px;font-size:clamp(13px,3.6vw,18px);font-weight:900;max-width:100%}
+#electroLaunchSplash .es-splash-products{display:flex;justify-content:center;align-items:center;gap:clamp(5px,2vw,14px);width:100%;font-size:clamp(32px,8vw,52px);filter:drop-shadow(0 5px 6px #00102c)}
+#electroLaunchSplash .es-splash-products span{display:grid;place-items:center;flex:1;min-width:0;aspect-ratio:1;border:2px solid #ffad22;border-radius:22px;background:linear-gradient(145deg,#fff,#dcecff 45%,#07316f);box-shadow:0 5px 14px #00102c}
+#electroLaunchSplash .es-splash-categories{display:flex;justify-content:space-between;gap:5px;width:100%;font-size:clamp(10px,2.7vw,14px);font-weight:800}
+#electroLaunchSplash .es-splash-categories span{flex:1;background:#08265f;border:1px solid #ffad22;border-radius:12px;padding:6px 2px}
+#electroLaunchSplash .es-splash-values{width:100%;display:flex;justify-content:space-around;gap:5px;padding:12px 5px;border-top:2px solid #ffc21b;border-bottom:2px solid #ffc21b;background:#061a49d9;font-size:clamp(11px,3vw,15px);font-weight:800}
+#electroLaunchSplash .es-splash-loading{display:flex;align-items:center;gap:12px;font-size:15px;font-weight:800;color:#fff}
+#electroLaunchSplash .es-splash-spinner{width:24px;height:24px;border:3px solid #ffffff55;border-top-color:#ffc21b;border-right-color:#ff8c12;border-radius:50%;animation:esSplashSpin .8s linear infinite}
+@keyframes esSplashSpin{to{transform:rotate(360deg)}}
+#electroLaunchSplash.es-splash-hide{opacity:0;visibility:hidden;pointer-events:none}
+@media(max-height:650px){#electroLaunchSplash{padding:10px}#electroLaunchSplash .es-splash-card{gap:7px}#electroLaunchSplash .es-splash-products{font-size:30px}#electroLaunchSplash .es-splash-values{padding:7px}}
+
+
 </style>
 </head>
 <body>
@@ -255,7 +279,7 @@ body.bottom-nav-hidden .bottom-nav-toggle .nav-toggle-label{display:none}
  <div class="es-splash-card">
   <div class="es-splash-mark"><span>ES</span></div>
   <div class="es-splash-title">ELECTRO <em>Sandy</em></div>
-  <div class="es-splash-ar" dir="rtl">إلكتر و ساندي</div>
+  <div class="es-splash-ar" dir="rtl">إلكترو ساندي</div>
   <div class="es-splash-tag">Accessoires &amp; Équipements Mobiles<br><span dir="rtl">إكسسوارات وملحقات الهاتف</span></div>
   <div class="es-splash-products" aria-hidden="true"><span>📱</span><span>⌚</span><span>🎧</span><span>🔌</span></div>
   <div class="es-splash-categories" dir="rtl"><span>سماعات</span><span>شواحن</span><span>كابلات</span><span>حمايات</span></div>
@@ -830,29 +854,6 @@ function printPeriodReport(){
  const toEnd=new Date(toDate.getTime());toEnd.setHours(23,59,59,999);
  if(fromDate>toEnd)return toast("تاريخ البداية خاصو يكون قبل تاريخ النهاية");
  let inRange=x=>{let d=periodDate(x);return d&&d>=fromDate&&d<=toEnd},list=orders.filter(inRange),periodReturns=returns.filter(inRange),grossSales=list.reduce((a,o)=>a+Math.max(0,Number(o.total||0)),0),returnedSales=periodReturns.reduce((a,r)=>{let v=Number(r.refund||0);return a+(Number.isFinite(v)&&v>0?v:0)},0),netSales=grossSales-returnedSales,expenses=cashEntries.filter(x=>x.type==="out"&&inRange(x)&&!x.supplierId&&!x.relatedPurchaseId&&x.entryKind!=="sale_refund"&&!String(x.note||"").startsWith("استرجاع فاتورة")).reduce((a,x)=>a+Number(x.amount||0),0),cashIncome=periodSaleReceipts(list,cashEntries,"cash")+cashEntries.filter(x=>x.type==="in"&&inRange(x)&&(!x.method||x.method==="cash")).reduce((a,x)=>a+Number(x.amount||0),0),bankIncome=periodSaleReceipts(list,cashEntries,"bank")+cashEntries.filter(x=>x.type==="in"&&x.method==="bank"&&inRange(x)).reduce((a,x)=>a+Number(x.amount||0),0),bankExpenses=cashEntries.filter(x=>x.type==="out"&&x.method==="bank"&&inRange(x)&&!x.supplierId&&!x.relatedPurchaseId&&x.entryKind!=="sale_refund"&&!String(x.note||"").startsWith("استرجاع فاتورة")).reduce((a,x)=>a+Number(x.amount||0),0),cashExpenses=Math.max(0,expenses-bankExpenses),rows=list.map(o=>"<tr><td>"+statementEscape(o.invoiceNo||("ES-"+o.id))+"</td><td>"+statementEscape(o.date||"")+"</td><td>"+statementEscape(o.customerInfo?.name||o.customer||"")+"</td><td>"+Number(o.total||0).toFixed(2)+"</td><td>"+Number(o.paidAmount??Math.max(0,Number(o.total||0)-Number(o.balance||0))).toFixed(2)+"</td><td>"+Math.max(0,Number(o.balance||0)).toFixed(2)+"</td></tr>").join(""),returnRows=periodReturns.map(r=>"<tr><td>"+statementEscape(r.invoiceNo||r.orderId||"")+"</td><td>"+statementEscape(r.productName||"")+"</td><td>"+statementEscape(r.qty??"")+"</td><td>"+Number(r.refund||0).toFixed(2)+"</td><td>"+statementEscape(r.date||"")+"</td></tr>").join(""),html="<html dir=\"rtl\"><meta charset=\"utf-8\"><title>تقرير ELECTRO Sandy</title><style>body{font-family:Arial;padding:24px}table{width:100%;border-collapse:collapse;margin:14px 0}td,th{border:1px solid #bbb;padding:8px;text-align:right}
-/* ELECTRO Sandy branded launch screen */
-#electroLaunchSplash{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:22px;background:radial-gradient(ellipse at 50% 38%,#1789ef 0%,#0750b7 36%,#061b4c 76%,#020d2b 100%);color:#fff;opacity:1;visibility:visible;transition:opacity .45s ease,visibility .45s ease;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
-#electroLaunchSplash:before,#electroLaunchSplash:after{content:"";position:absolute;pointer-events:none;left:-22%;width:145%;height:23%;border:12px solid #ff9b12;border-left-color:transparent;border-right-color:transparent;transform:rotate(-12deg);filter:drop-shadow(0 0 12px #ff9b12)}
-#electroLaunchSplash:before{top:5%;border-bottom:0;border-radius:50%}
-#electroLaunchSplash:after{bottom:1%;border-top:0;border-radius:50%}
-#electroLaunchSplash .es-splash-card{position:relative;z-index:1;width:min(100%,520px);max-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:clamp(9px,2vh,20px)}
-#electroLaunchSplash .es-splash-mark{width:clamp(82px,19vw,132px);aspect-ratio:1;border:4px solid #ffd15a;border-radius:27%;background:linear-gradient(145deg,#fff 0%,#d8eaff 18%,#08265f 46%,#031337 100%);box-shadow:0 0 0 5px #f18b10,0 8px 30px #00102c;display:grid;place-items:center;color:#ffb21d;font-size:clamp(38px,9vw,62px);font-weight:1000;letter-spacing:-5px;text-shadow:2px 3px 0 #061b4c}
-#electroLaunchSplash .es-splash-mark span{color:#fff}
-#electroLaunchSplash .es-splash-title{font-size:clamp(30px,8vw,54px);font-weight:1000;line-height:1.02;letter-spacing:-1.5px;text-shadow:0 4px 0 #03143d,0 8px 20px #00102c}
-#electroLaunchSplash .es-splash-title em{font-style:normal;color:#ff9b13}
-#electroLaunchSplash .es-splash-ar{font-size:clamp(19px,5vw,29px);font-weight:900;color:#ffcf35;text-shadow:0 3px 0 #03143d}
-#electroLaunchSplash .es-splash-tag{background:#ffc21b;color:#071b42;border-radius:999px;padding:8px 18px;font-size:clamp(13px,3.6vw,18px);font-weight:900;max-width:100%}
-#electroLaunchSplash .es-splash-products{display:flex;justify-content:center;align-items:center;gap:clamp(5px,2vw,14px);width:100%;font-size:clamp(32px,8vw,52px);filter:drop-shadow(0 5px 6px #00102c)}
-#electroLaunchSplash .es-splash-products span{display:grid;place-items:center;flex:1;min-width:0;aspect-ratio:1;border:2px solid #ffad22;border-radius:22px;background:linear-gradient(145deg,#fff,#dcecff 45%,#07316f);box-shadow:0 5px 14px #00102c}
-#electroLaunchSplash .es-splash-categories{display:flex;justify-content:space-between;gap:5px;width:100%;font-size:clamp(10px,2.7vw,14px);font-weight:800}
-#electroLaunchSplash .es-splash-categories span{flex:1;background:#08265f;border:1px solid #ffad22;border-radius:12px;padding:6px 2px}
-#electroLaunchSplash .es-splash-values{width:100%;display:flex;justify-content:space-around;gap:5px;padding:12px 5px;border-top:2px solid #ffc21b;border-bottom:2px solid #ffc21b;background:#061a49d9;font-size:clamp(11px,3vw,15px);font-weight:800}
-#electroLaunchSplash .es-splash-loading{display:flex;align-items:center;gap:12px;font-size:15px;font-weight:800;color:#fff}
-#electroLaunchSplash .es-splash-spinner{width:24px;height:24px;border:3px solid #ffffff55;border-top-color:#ffc21b;border-right-color:#ff8c12;border-radius:50%;animation:esSplashSpin .8s linear infinite}
-@keyframes esSplashSpin{to{transform:rotate(360deg)}}
-#electroLaunchSplash.es-splash-hide{opacity:0;visibility:hidden;pointer-events:none}
-@media(max-height:650px){#electroLaunchSplash{padding:10px}#electroLaunchSplash .es-splash-card{gap:7px}#electroLaunchSplash .es-splash-products{font-size:30px}#electroLaunchSplash .es-splash-values{padding:7px}}
-
 </style><h2>ELECTRO Sandy — تقرير المبيعات والمرتجعات</h2><p>الفترة: "+statementEscape(from)+" إلى "+statementEscape(to)+"</p><p>مبيعات الفواتير: "+grossSales.toFixed(2)+" DH</p><p>المرتجعات المسجلة خلال الفترة: "+returnedSales.toFixed(2)+" DH</p><h3>صافي المبيعات: "+netSales.toFixed(2)+" DH</h3><p>مداخيل الصندوق: "+cashIncome.toFixed(2)+" DH • مداخيل البنك: "+bankIncome.toFixed(2)+" DH</p><p>مصاريف الصندوق: "+cashExpenses.toFixed(2)+" DH • مصاريف البنك: "+bankExpenses.toFixed(2)+" DH</p><p>إجمالي المصاريف المسجلة: "+expenses.toFixed(2)+" DH</p><h3>الفواتير</h3><table><tr><th>الفاتورة</th><th>التاريخ</th><th>الزبون</th><th>المجموع</th><th>المؤدى</th><th>المتبقي</th></tr>"+(rows||"<tr><td colspan=\"6\">لا توجد فواتير</td></tr>")+"</table><h3>المرتجعات</h3><table><tr><th>الفاتورة</th><th>المنتج</th><th>الكمية</th><th>قيمة الاسترجاع</th><th>التاريخ</th></tr>"+(returnRows||"<tr><td colspan=\"5\">لا توجد مرتجعات</td></tr>")+"</table></html>";printHtmlDocument(html,"تقرير المبيعات "+from+" - "+to)}
 function exportPeriodReport(){
  let from=document.getElementById("reportFrom")?.value,to=document.getElementById("reportTo")?.value;
