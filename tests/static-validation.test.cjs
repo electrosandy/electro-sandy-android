@@ -824,6 +824,12 @@ test('dynamic text prefixes translate and restore without changing their values'
     getAttribute: name => placeholder.get(name),
     setAttribute: (name, value) => placeholder.set(name, value)
   };
+  const imageAlt = new Map([['alt', 'صورة 2']]);
+  const imageElement = {
+    hasAttribute: name => imageAlt.has(name),
+    getAttribute: name => imageAlt.get(name),
+    setAttribute: (name, value) => imageAlt.set(name, value)
+  };
   const context = {
     document: {
       body: { classList: {
@@ -835,7 +841,7 @@ test('dynamic text prefixes translate and restore without changing their values'
         let used = false;
         return { nextNode: () => used ? null : (used = true, textNode) };
       },
-      querySelectorAll: () => [inputElement],
+      querySelectorAll: () => [inputElement, imageElement],
       getElementById: id => id === 'langSelect' ? selector : null
     },
     NodeFilter: { SHOW_TEXT: 4 },
@@ -848,12 +854,15 @@ test('dynamic text prefixes translate and restore without changing their values'
   context.applyLanguage('en');
   assert.equal(textNode.nodeValue, 'Net sales: 125.00 DH');
   assert.equal(placeholder.get('placeholder'), 'Administrator name');
+  assert.equal(imageAlt.get('alt'), 'Photo 2');
   context.applyLanguage('fr');
   assert.equal(textNode.nodeValue, 'Ventes nettes: 125.00 DH');
   assert.equal(placeholder.get('placeholder'), 'Nom de l’administrateur');
+  assert.equal(imageAlt.get('alt'), 'Photo 2');
   context.applyLanguage('ar');
   assert.equal(textNode.nodeValue, 'المبيعات الصافية: 125.00 DH');
   assert.equal(placeholder.get('placeholder'), 'اسم المدير');
+  assert.equal(imageAlt.get('alt'), 'صورة 2');
 });
 
 test('Arabic toast, alert and confirmation messages have English and French translations', () => {
