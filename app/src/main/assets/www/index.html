@@ -604,12 +604,12 @@ const extraTranslations={
 const translatedTextNodes=new WeakMap();
 function translateDocumentText(){
  const lang=document.documentElement.lang||'ar';
- if(lang==='ar')return;
  const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
  let node;
  while((node=walker.nextNode())){
   if(node.parentElement&&node.parentElement.closest('.langar,.langfr,.langen,script,style'))continue;
   const original=translatedTextNodes.get(node)||node.nodeValue;
+  if(lang==='ar'){if(translatedTextNodes.has(node))node.nodeValue=original;continue;}
   const pair=extraTranslations[original.trim()];
   if(!pair)continue;
   translatedTextNodes.set(node,original);
