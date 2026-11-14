@@ -896,10 +896,10 @@ test('Arabic toast, alert and confirmation messages have English and French tran
   }, NodeFilter: { SHOW_TEXT: 4 }, localStorage: { setItem: () => {}, getItem: () => null } };
   vm.runInNewContext(html.slice(start, end), context);
   const dictionary = vm.runInNewContext('extraTranslations', context);
-  const messages = [...html.matchAll(/(?:toast|alert|confirm)\(\s*(['"])([^'"\n]{1,180})\1/g)]
+  const messages = [...html.matchAll(/(?:toast|alert|confirm|prompt)\(\s*(['"])([^'"\n]{1,180})\1/g)]
     .map(match => match[2].trim()).filter(value => /[\u0600-\u06FF]/.test(value));
   const missing = [...new Set(messages.filter(message => !dictionary[message]))];
-  assert.deepEqual(missing, [], 'Every Arabic toast, alert and confirmation needs a translation');
+  assert.deepEqual(missing, [], 'Every Arabic toast, alert, confirmation and prompt needs a translation');
   const attributes = [...new Set([...html.matchAll(/\b(?:placeholder|title|aria-label|alt)\s*=\s*["']([^"']+)["']/g)]
     .map(match => match[1]).filter(value => /[\u0600-\u06FF]/.test(value)))];
   const missingAttributes = attributes.filter(value => !dictionary[value] &&
