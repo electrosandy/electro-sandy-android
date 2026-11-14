@@ -881,8 +881,8 @@ test('Arabic toast, alert and confirmation messages have English and French tran
     .map(match => match[2].trim()).filter(value => /[\u0600-\u06FF]/.test(value));
   const missing = [...new Set(messages.filter(message => !dictionary[message]))];
   assert.deepEqual(missing, [], 'Every Arabic toast, alert and confirmation needs a translation');
-  const attributes = [...new Set([...html.matchAll(/\\b(?:placeholder|title|aria-label|alt)\\s*=\\s*["']([^"']+)["']/g)]
-    .map(match => match[1]).filter(value => /[\\u0600-\\u06FF]/.test(value)))];
+  const attributes = [...new Set([...html.matchAll(/\b(?:placeholder|title|aria-label|alt)\s*=\s*["']([^"']+)["']/g)]
+    .map(match => match[1]).filter(value => /[\u0600-\u06FF]/.test(value)))];
   const missingAttributes = attributes.filter(value => !dictionary[value] &&
     !Object.keys(dictionary).some(key => key.length >= 4 && value.trim().startsWith(key)));
   assert.deepEqual(missingAttributes, [], 'Every Arabic placeholder and accessibility label needs a translation');
