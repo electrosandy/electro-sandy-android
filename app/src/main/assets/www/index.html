@@ -618,8 +618,8 @@ function translateMessage(message){
  const pair=matchKey?extraTranslations[matchKey]:null;
  return pair?original.replace(matchKey,pair[lang==='en'?0:1]):original;
 }
-const nativeAlert=typeof window.alert==='function'?window.alert.bind(window):null;
-const nativeConfirm=typeof window.confirm==='function'?window.confirm.bind(window):null;
+const nativeAlert=typeof window!=='undefined'&&typeof window.alert==='function'?window.alert.bind(window):null;
+const nativeConfirm=typeof window!=='undefined'&&typeof window.confirm==='function'?window.confirm.bind(window):null;
 if(nativeAlert)window.alert=message=>nativeAlert(translateMessage(message));
 if(nativeConfirm)window.confirm=message=>nativeConfirm(translateMessage(message));
 const translatedTextNodes=new WeakMap();
